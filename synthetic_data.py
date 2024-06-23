@@ -31,8 +31,6 @@ e0 = stations['e'].mean()
 n0 = stations['n'].mean()
 u0 = stations['u'].mean()
 
-# random integer number beween 1 and 100
-n_events = np.random.randint(1, 100)
 duration = 60
 
 v_p = 5500.  # m/s
@@ -41,6 +39,8 @@ v_s = 2700.  # m/s
 out_dir = 'data/raw'
 
 for i in range(500):
+    # random integer number beween 1 and 100
+    n_events = np.random.randint(1, 100)
     catalog = create_synthetic_catalog(n_events, duration, e0, n0, u0)
     associations = create_associations(catalog, stations, v_p, v_s, 60)
     arrivals = associations.join(stations.set_index('id'), on='station')
