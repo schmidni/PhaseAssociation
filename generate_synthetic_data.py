@@ -30,7 +30,7 @@ def create_synthetic_data(out_dir: Path,
     print("Creating synthetic catalogs...")
     for i in tqdm.tqdm(range(n_catalogs)):
         # random integer number beween 1 and 100
-        n_events = np.random.randint(0, max_n_events)
+        n_events = np.random.randint(1, max_n_events)
         catalog = create_synthetic_catalog(n_events, duration, *center)
         associations = create_associations(catalog, stations, v_p, v_s, 60)
         arrivals = associations.join(stations.set_index('id'), on='station')
@@ -44,6 +44,7 @@ if __name__ == '__main__':
     out_dir = Path('data/raw')
     max_n_events = 15
     duration = 30
-    n_catalogs = 1
+    n_catalogs = 2500
 
-    create_synthetic_data(out_dir, n_catalogs, max_n_events, duration)
+    create_synthetic_data(out_dir, n_catalogs,
+                          max_n_events, duration, stations)

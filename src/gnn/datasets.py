@@ -124,7 +124,6 @@ def transform_knn_stations(arrivals, stations, nearest_stations):
     a = torch.tensor(arrivals['amplitude'].values, dtype=torch.float)
     features.append(min_max_normalize(a))
     features = torch.vstack(features).T
-    print(arrivals)
 
     data = Data()
     data.x = features
