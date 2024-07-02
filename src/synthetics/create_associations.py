@@ -2,7 +2,7 @@ import numpy as np
 import pandas as pd
 from scipy.spatial import distance_matrix
 
-from src.butler_vanaswegen import Butler_VanAswegen_1993
+from src.synthetics.butler_vanaswegen import Butler_VanAswegen_1993
 
 
 def inventory_to_stations(path: str):

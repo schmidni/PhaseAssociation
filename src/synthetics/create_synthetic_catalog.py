@@ -4,10 +4,11 @@ import matplotlib.pyplot as plt  # noqa
 import numpy as np
 import pandas as pd
 
-from src.generate_poisson import generate_poisson_events, plot_poisson  # noqa
-from src.seismicity_samples_Dieterich94 import (
+from src.synthetics.generate_poisson import (generate_poisson_events,  # noqa
+                                             plot_poisson)
+from src.synthetics.seismicity_samples_Dieterich94 import (
     get_rectangular_slippatch_from_FM, get_seismicity_sample_from_Dieterich94)
-from src.simulate_magnitudes import simulate_magnitudes
+from src.synthetics.simulate_magnitudes import simulate_magnitudes
 
 
 def create_synthetic_catalog(n_events: int,

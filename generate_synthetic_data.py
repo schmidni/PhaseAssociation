@@ -5,8 +5,9 @@ import numpy as np
 import pandas as pd
 import tqdm
 
-from src.create_associations import create_associations, inventory_to_stations
-from src.create_synthetic_catalog import create_synthetic_catalog
+from src.synthetics.create_associations import (create_associations,
+                                                inventory_to_stations)
+from src.synthetics.create_synthetic_catalog import create_synthetic_catalog
 
 
 def create_synthetic_data(out_dir: Path,
