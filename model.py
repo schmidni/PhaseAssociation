@@ -15,7 +15,7 @@ from torch_geometric.nn import global_mean_pool as gap
 from src.gnn.datasets import PhaseAssociationDataset
 
 # %%
-dataset = PhaseAssociationDataset('data', force_reload=True)
+dataset = PhaseAssociationDataset('data', force_reload=False)
 
 # %%
 
@@ -34,7 +34,7 @@ class GCN(torch.nn.Module):
         self.initial_conv = GCNConv(in_channels, embedding_size)
         self.conv1 = GCNConv(embedding_size, embedding_size)
         self.conv2 = GCNConv(embedding_size, embedding_size)
-        self.conv3 = GCNConv(embedding_size, embedding_size)
+        # self.conv3 = GCNConv(embedding_size, embedding_size)
 
         self.lin = Linear(embedding_size*2, embedding_size)
         self.dropout = torch.nn.Dropout(dropout)
@@ -52,8 +52,8 @@ class GCN(torch.nn.Module):
         hidden = F.relu(hidden)
         hidden = self.conv2(hidden, edge_index)
         hidden = F.relu(hidden)
-        hidden = self.conv3(hidden, edge_index)
-        hidden = F.relu(hidden)
+        # hidden = self.conv3(hidden, edge_index)
+        # hidden = F.relu(hidden)
 
         # Global Pooling (stack different aggregations)
         hidden = torch.cat([gmp(hidden, batch_index),
@@ -73,7 +73,8 @@ class GCN(torch.nn.Module):
         return out, hidden
 
 
-model = GCN(dataset[0].num_features, 1, embedding_size=8, dropout=0.2)
+model = GCN(dataset[0].num_features, 1,
+            embedding_size=dataset[0].num_features*2, dropout=0.2)
 
 # %%
 
@@ -87,7 +88,7 @@ device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 model = model.to(device)
 
 data_size = len(dataset)
-NUM_GRAPHS_PER_BATCH = 64
+NUM_GRAPHS_PER_BATCH = 128
 loader = DataLoader(dataset[:int(data_size * 0.8)],
                     batch_size=NUM_GRAPHS_PER_BATCH, shuffle=True)
 test_loader = DataLoader(dataset[int(data_size * 0.8):],
@@ -115,8 +116,8 @@ def train():
 # %%
 def test(loader):
     model.eval()
-    predicted = torch.tensor([])
-    actual = torch.tensor([])
+    predicted = torch.tensor([]).to(device)
+    actual = torch.tensor([]).to(device)
     for data in loader:
         data.to(device)
         pred, embedding = model(data.x.float(), data.edge_index, data.batch)
@@ -129,7 +130,7 @@ def test(loader):
         'sum': torch.sum(torch.abs(predicted - actual)).item(),
         'mean': torch.mean(torch.abs(predicted - actual)).item(),
         'accuracy': (torch.sum(
-            torch.abs(predicted - actual) < 1) / len(actual)).item()
+            torch.abs(predicted - actual) < 0.5) / len(actual)).item()
     }
 
     return class_metrics

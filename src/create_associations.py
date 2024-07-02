@@ -1,6 +1,7 @@
 import numpy as np
 import pandas as pd
 from scipy.spatial import distance_matrix
+
 from src.butler_vanaswegen import Butler_VanAswegen_1993
 
 
@@ -45,19 +46,23 @@ def create_associations(catalog: pd.DataFrame,
     phase_s = np.full_like(event_indices, 'S', dtype='U1')
 
     at_p_np = np.array(
-        list(zip(event_indices, station_indices, at_p.ravel(), phase_p)),
+        list(zip(event_indices, station_indices,
+             at_p.ravel(), phase_p, gmvs.ravel())),
         dtype=[('event', 'i4'),
                ('station', 'i4'),
                ('time', 'datetime64[ns]'),
-               ('phase', 'U1')])[detection_mask_np]
+               ('phase', 'U1'),
+               ('amplitude', 'f8')])[detection_mask_np]
     at_p_np = pd.DataFrame(at_p_np)
 
     at_s_np = np.array(
-        list(zip(event_indices, station_indices, at_s.ravel(), phase_s)),
+        list(zip(event_indices, station_indices,
+             at_s.ravel(), phase_s, gmvs.ravel())),
         dtype=[('event', 'i4'),
                ('station', 'i4'),
                ('time', 'datetime64[ns]'),
-               ('phase', 'U1')])[detection_mask_np]
+               ('phase', 'U1'),
+               ('amplitude', 'f8')])[detection_mask_np]
     at_s_np = pd.DataFrame(at_s_np)
 
     arrivals = pd.concat([at_p_np, at_s_np], ignore_index=True)

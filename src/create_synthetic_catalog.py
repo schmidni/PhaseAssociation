@@ -3,6 +3,7 @@ from datetime import datetime
 import matplotlib.pyplot as plt  # noqa
 import numpy as np
 import pandas as pd
+
 from src.generate_poisson import generate_poisson_events, plot_poisson  # noqa
 from src.seismicity_samples_Dieterich94 import (
     get_rectangular_slippatch_from_FM, get_seismicity_sample_from_Dieterich94)
@@ -13,7 +14,7 @@ def create_synthetic_catalog(n_events: int,
                              duration: float,
                              e: float,
                              n: float,
-                             u: float):
+                             u: float) -> pd.DataFrame:
 
     # Specify reference focal mechanism
     stk0 = 45
