@@ -44,7 +44,7 @@ if __name__ == '__main__':
     out_dir = Path('data/raw')
     max_n_events = 15
     duration = 30
-    n_catalogs = 2500
+    n_catalogs = 1
 
     create_synthetic_data(out_dir, n_catalogs,
                           max_n_events, duration, stations)

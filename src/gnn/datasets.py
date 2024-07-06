@@ -75,16 +75,17 @@ def find_matching_indices(A, S):
 
     """
     # Get the unique values in A and their corresponding indices
-    unique_values, inverse_indices = np.unique(A, return_inverse=True)
+    unique_values, inverse_indices = np.unique(A[:, 0], return_inverse=True)
 
     # Create a dictionary to map each value in A to its indices
-    value_to_indices = {val: np.where(A == val)[0] for val in unique_values}
+    value_to_indices = {val: np.where(A[:, 0] == val)[0]
+                        for val in unique_values}
 
     # Initialize an empty list to collect the results
     result = []
 
     # Iterate over each element in A with its index
-    for idx, a_o in enumerate(A):
+    for idx, a_o in enumerate(A[:, 0]):
         # Get the corresponding row from S
         row_indices = S[a_o]
 
@@ -95,14 +96,18 @@ def find_matching_indices(A, S):
 
             # For each matching index, append the result
             for match_idx in matching_indices:
-                result.append((idx, match_idx))
+                diff = np.abs(A[idx, 1] - A[match_idx, 1])
+
+                if diff < 1e9:
+                    result.append((idx, match_idx))
 
     # Convert result list to a numpy array with shape (2, j)
     if result:
         R = np.array(result).T
     else:
         R = np.empty((2, 0), dtype=int)
-
+    print(R)
+    print(R.shape)
     return R
 
 
@@ -141,9 +146,14 @@ def transform_knn_stations(arrivals, stations, nearest_stations):
 
     data = Data()
     data.x = features
+
     # build COO representation of the graph edges
-    data.edge_index = torch.tensor(find_matching_indices(
-        arrivals['station_idx'].values, nearest_stations), dtype=torch.long)
+    data.edge_index = \
+        torch.tensor(
+            find_matching_indices(
+                arrivals[['station_idx', 'time']].values,
+                nearest_stations),
+            dtype=torch.long)
 
     # graph label: number of unique events
     data.y = torch.tensor([[arrivals['event'].nunique()]], dtype=torch.float)
