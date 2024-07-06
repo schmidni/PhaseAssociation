@@ -60,6 +60,20 @@ def transform_simple_knn(arrivals):
 
 
 def find_matching_indices(A, S):
+    """
+    Given array with the id's of arrivals, and a matrix with the k nearest
+    stations to each station, this function returns a COO representation of
+    the graph edges connecting each arrival to the arrivals of the neighbouring
+    stations.
+
+    Parameters
+    ----------
+    A : np.array
+        Station index of the arrivals.
+    S : np.array
+        K nearest stations to each station.
+
+    """
     # Get the unique values in A and their corresponding indices
     unique_values, inverse_indices = np.unique(A, return_inverse=True)
 
@@ -150,9 +164,6 @@ class PhaseAssociationDataset(InMemoryDataset):
         X = self.stations[['e', 'n', 'u']].values
         nbrs = NearestNeighbors(n_neighbors=6).fit(X)
         _, self.nearest_stations = nbrs.kneighbors(X)
-
-        row_indices = np.arange(self.nearest_stations.shape[0]).reshape(-1, 1)
-        self.nearest_stations = np.hstack((self.nearest_stations, row_indices))
 
         super().__init__(root, transform, pre_transform,
                          pre_filter, force_reload=force_reload)
