@@ -1,4 +1,5 @@
 import os
+from typing import Literal
 
 import numpy as np
 import pandas as pd
@@ -106,12 +107,14 @@ def find_matching_indices(A, S):
         R = np.array(result).T
     else:
         R = np.empty((2, 0), dtype=int)
-    print(R)
-    print(R.shape)
+
     return R
 
 
-def transform_knn_stations(arrivals, stations, nearest_stations):
+def transform_knn_stations(arrivals: pd.DataFrame,
+                           stations: pd.DataFrame,
+                           nearest_stations: np.ndarray,
+                           label: Literal['event', 'n_clusters'] = 'event'):
     """
     Uses Arrivals as nodes, and builds the graph by connecting each arrival
     not only to other arrivals of the same station, but also the arrivals
@@ -155,8 +158,13 @@ def transform_knn_stations(arrivals, stations, nearest_stations):
                 nearest_stations),
             dtype=torch.long)
 
-    # graph label: number of unique events
-    data.y = torch.tensor([[arrivals['event'].nunique()]], dtype=torch.float)
+    if label == 'event':
+        # graph label: event id
+        data.y = torch.tensor(arrivals['event'], dtype=torch.int8)
+    elif label == 'n_clusters':
+        # graph label: number of unique events
+        data.y = torch.tensor(
+            [[arrivals['event'].nunique()]], dtype=torch.long)
 
     # data.validate(raise_on_error=True)
     return data

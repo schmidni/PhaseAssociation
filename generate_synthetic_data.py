@@ -12,7 +12,8 @@ from src.synthetics.create_synthetic_catalog import create_synthetic_catalog
 
 def create_synthetic_data(out_dir: Path,
                           n_catalogs: int,
-                          max_n_events: int,
+                          n_events: int,
+                          n_events_fixed: bool,
                           duration: int,
                           stations: pd.DataFrame):
 
@@ -29,9 +30,10 @@ def create_synthetic_data(out_dir: Path,
 
     print("Creating synthetic catalogs...")
     for i in tqdm.tqdm(range(n_catalogs)):
-        # random integer number beween 1 and 100
-        n_events = np.random.randint(1, max_n_events)
-        catalog = create_synthetic_catalog(n_events, duration, *center)
+        if not n_events_fixed:
+            # random integer number
+            n = np.random.randint(1, n_events)
+        catalog = create_synthetic_catalog(n, duration, *center)
         associations = create_associations(catalog, stations, v_p, v_s, 60)
         arrivals = associations.join(stations.set_index('id'), on='station')
         arrivals = arrivals.drop(columns=['longitude', 'latitude', 'altitude'])
@@ -42,9 +44,14 @@ if __name__ == '__main__':
 
     stations = inventory_to_stations('stations/station_cords_blab_VALTER.csv')
     out_dir = Path('data/raw')
-    max_n_events = 15
+    n_events = 15
+    n_events_fixed = False
     duration = 30
-    n_catalogs = 1
+    n_catalogs = 5000
 
-    create_synthetic_data(out_dir, n_catalogs,
-                          max_n_events, duration, stations)
+    create_synthetic_data(out_dir,
+                          n_catalogs,
+                          n_events,
+                          n_events_fixed,
+                          duration,
+                          stations)
