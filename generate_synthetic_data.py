@@ -30,6 +30,7 @@ def create_synthetic_data(out_dir: Path,
 
     print("Creating synthetic catalogs...")
     for i in tqdm.tqdm(range(n_catalogs)):
+        n = n_events
         if not n_events_fixed:
             # random integer number
             n = np.random.randint(1, n_events)
@@ -45,9 +46,9 @@ if __name__ == '__main__':
     stations = inventory_to_stations('stations/station_cords_blab_VALTER.csv')
     out_dir = Path('data/raw')
     n_events = 15
-    n_events_fixed = False
+    n_events_fixed = True
     duration = 30
-    n_catalogs = 5000
+    n_catalogs = 1000
 
     create_synthetic_data(out_dir,
                           n_catalogs,

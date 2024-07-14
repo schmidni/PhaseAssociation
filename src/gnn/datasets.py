@@ -1,3 +1,4 @@
+import multiprocessing
 import os
 from typing import Literal
 
@@ -114,7 +115,8 @@ def find_matching_indices(A, S):
 def transform_knn_stations(arrivals: pd.DataFrame,
                            stations: pd.DataFrame,
                            nearest_stations: np.ndarray,
-                           label: Literal['event', 'n_clusters'] = 'event'):
+                           label: Literal['event', 'n_clusters'] = 'event',
+                           include_s: bool = True):
     """
     Uses Arrivals as nodes, and builds the graph by connecting each arrival
     not only to other arrivals of the same station, but also the arrivals
@@ -128,15 +130,15 @@ def transform_knn_stations(arrivals: pd.DataFrame,
     arrivals['station_idx'] = arrivals['station'].apply(
         lambda x: stations[stations['id'] == x].index[0])
 
-    arrivals = arrivals[arrivals['phase'] == 'P']
-
     features = []
-
+    if not include_s:
+        arrivals = arrivals[arrivals['phase'] == 'P']
+    else:
+        phase = torch.tensor(arrivals['phase'].replace(
+            {'P': '0', 'S': '1'}).astype('int32').values, dtype=torch.int32)
+        features.append(phase)
     time_ = torch.tensor(arrivals['time'].values, dtype=torch.long)
     features.append(min_max_normalize(time_))
-    # phase = torch.tensor(arrivals['phase'].replace(
-    #     {'P': '0', 'S': '1'}).astype('int32').values, dtype=torch.int32)
-    # features.append(phase)
     e = torch.tensor(arrivals['e'].values, dtype=torch.float)
     features.append(min_max_normalize(e))
     n = torch.tensor(arrivals['n'].values, dtype=torch.float)
@@ -160,7 +162,7 @@ def transform_knn_stations(arrivals: pd.DataFrame,
 
     if label == 'event':
         # graph label: event id
-        data.y = torch.tensor(arrivals['event'], dtype=torch.int8)
+        data.y = torch.tensor(arrivals['event'], dtype=torch.long)
     elif label == 'n_clusters':
         # graph label: number of unique events
         data.y = torch.tensor(
@@ -180,7 +182,8 @@ class PhaseAssociationDataset(InMemoryDataset):
 
         self.stations = pd.read_csv(os.path.join(root, 'raw', 'stations.csv'))
         X = self.stations[['e', 'n', 'u']].values
-        nbrs = NearestNeighbors(n_neighbors=16).fit(X)
+        nbrs = NearestNeighbors(n_neighbors=6,
+                                n_jobs=multiprocessing.cpu_count()).fit(X)
         _, self.nearest_stations = nbrs.kneighbors(X)
 
         super().__init__(root, transform, pre_transform,
@@ -222,3 +225,41 @@ class PhaseAssociationDataset(InMemoryDataset):
                                        self.nearest_stations))
 
         self.save(new_list, self.processed_paths[0])
+
+
+def add_mask_to_data(data: Data,
+                     train_ratio: float,
+                     val_ratio: float,
+                     test_ratio: float) -> Data:
+
+    # Ensure the ratios sum to 1.0
+    np.testing.assert_almost_equal(
+        train_ratio + val_ratio + test_ratio, 1.0)
+    num_nodes = data.x.size(0)
+
+    # Determine the number of nodes for each set
+    num_train = int(train_ratio * num_nodes)
+    num_val = int(val_ratio * num_nodes)
+
+    # Create random permutation of indices
+    indices = np.random.permutation(num_nodes)
+
+    # Split the indices according to the ratios
+    train_idx = indices[:num_train]
+    val_idx = indices[num_train:num_train + num_val]
+    test_idx = indices[num_train + num_val:]
+
+    # Create boolean masks
+    train_mask = torch.zeros(num_nodes, dtype=torch.bool)
+    val_mask = torch.zeros(num_nodes, dtype=torch.bool)
+    test_mask = torch.zeros(num_nodes, dtype=torch.bool)
+
+    train_mask[train_idx] = True
+    val_mask[val_idx] = True
+    test_mask[test_idx] = True
+
+    # Add masks to the data object
+    data.train_mask = train_mask
+    data.val_mask = val_mask
+    data.test_mask = test_mask
+    return data

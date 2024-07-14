@@ -1,31 +1,40 @@
 # %%
-import os.path as osp
+import time
 
+import numpy as np
 import torch
-import torch_geometric.transforms as T
 from sklearn.metrics import normalized_mutual_info_score as NMI
 from torch.nn import Linear
 from torch_geometric import utils
-from torch_geometric.datasets import Planetoid
+from torch_geometric.loader import DataLoader
 from torch_geometric.nn import GraphConv, Sequential, dense_mincut_pool
 from torch_geometric.nn.conv.gcn_conv import gcn_norm
 
+from src.gnn.datasets import PhaseAssociationDataset
+
 torch.manual_seed(0)  # for reproducibility
 
-# %%
 # Load data
-dataset = 'Cora'
-path = osp.join(osp.dirname(osp.realpath(__file__)), 'data', dataset)
-dataset = Planetoid(path, dataset, transform=T.NormalizeFeatures())
-data = dataset[0]
-print(data.x)
+dataset = PhaseAssociationDataset('data', force_reload=False)
+n = (len(dataset) + 9) // 10
 
+for d in dataset:
+    d.edge_index, d.edge_weight = gcn_norm(
+        d.edge_index, d.edge_weight, d.num_nodes,
+        add_self_loops=False, dtype=d.x.dtype)
+
+test_dataset = dataset[:n]
+val_dataset = dataset[n:2 * n]
+train_dataset = dataset[2 * n:]
+test_loader = DataLoader(test_dataset, batch_size=20)
+val_loader = DataLoader(val_dataset, batch_size=20)
+train_loader = DataLoader(train_dataset, batch_size=20)
 
 # %%
 # Normalized adjacency matrix
-data.edge_index, data.edge_weight = gcn_norm(
-    data.edge_index, data.edge_weight, data.num_nodes,
-    add_self_loops=False, dtype=data.x.dtype)
+# data.edge_index, data.edge_weight = gcn_norm(
+#     data.edge_index, data.edge_weight, data.num_nodes,
+#     add_self_loops=False, dtype=data.x.dtype)
 
 # %%
 
@@ -81,39 +90,73 @@ class Net(torch.nn.Module):
 
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-data = data.to(device)
-model = Net([16], "ELU", dataset.num_features, dataset.num_classes).to(device)
-print(model)
-optimizer = torch.optim.Adam(model.parameters(), lr=1e-2)
+# data = data.to(device)
+model = Net([2], "ELU", dataset.num_features, dataset.num_classes).to(device)
+
+optimizer = torch.optim.Adam(model.parameters(), lr=1e-3, weight_decay=1e-4)
+
+# %%
 
 
-def train():
+def train(epoch):
     model.train()
-    optimizer.zero_grad()
-    _, mc_loss, o_loss = model(data.x, data.edge_index, data.edge_weight)
-    loss = mc_loss + o_loss
-    loss.backward()
-    optimizer.step()
-    return loss.item()
+    loss_all = 0
+
+    for data in train_loader:
+        data = data.to(device)
+        for i in range(10):
+            optimizer.zero_grad()
+            _, mc_loss, o_loss = model(
+                data.x, data.edge_index, data.edge_weight)
+            loss = mc_loss + o_loss
+            loss.backward()
+            loss_all += data.y.size(0) * float(loss)
+            optimizer.step()
+    return loss_all / len(train_dataset)
 
 
 @torch.no_grad()
-def test():
+def test(loader):
     model.eval()
-    clust, _, _ = model(data.x, data.edge_index, data.edge_weight)
-    return NMI(clust.max(1)[1].cpu(), data.y.cpu())
+    nmi = 0
+    loss_all = 0
+    for data in loader:
+        data = data.to(device)
+        clust, mc_loss, o_loss = model(
+            data.x, data.edge_index, data.edge_weight)
+        loss = mc_loss + o_loss
+        loss_all += data.y.size(0) * float(loss)
+        nmi += NMI(clust.max(1)[1].cpu(), data.y.cpu())
+    rand_idx = np.random.randint(1, 1001, size=15)
+    print(
+        torch.stack((clust.max(1)[1][rand_idx].cpu(),
+                     data.y[rand_idx].cpu()), 0))
+    return loss_all / len(loader.dataset), nmi / len(loader.dataset)
 
 
-patience = 50
-best_nmi = 0
-for epoch in range(1, 10000):
-    train_loss = train()
-    nmi = test()
-    print(f'Epoch: {epoch:03d}, Loss: {train_loss:.4f}, NMI: {nmi:.3f}')
-    if nmi > best_nmi:
-        best_nmi = nmi
-        patience = 50
+times = []
+best_val_nmi = test_nmi = 0
+best_val_loss = float('inf')
+patience = start_patience = 50
+
+for epoch in range(1, 15001):
+    start = time.time()
+    train_loss = train(epoch)
+    _, train_nmi = test(train_loader)
+    val_loss, val_nmi = test(val_loader)
+    if val_loss < best_val_loss:
+        test_loss, test_nmi = test(test_loader)
+        best_val_nmi = val_nmi
+        patience = start_patience
     else:
         patience -= 1
-    if patience == 0:
-        break
+        if patience == 0:
+            break
+    print(f'Epoch: {epoch:03d}, Train Loss: {train_loss:.3f}, '
+          f'Train NMI: {train_nmi:.3f}, Val Loss: {val_loss:.3f}, '
+          f'Val NMI: {val_nmi:.3f}, Test Loss: {test_loss:.3f}, '
+          f'Test NMI: {test_nmi:.3f}')
+    times.append(time.time() - start)
+print(f"Median time per epoch: {torch.tensor(times).median():.4f}s")
+
+# %%
