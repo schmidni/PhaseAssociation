@@ -19,6 +19,9 @@ dataset = PhaseAssociationDataset('data', force_reload=False)
 
 # %%
 
+# Use GPU for training
+device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+
 
 class GCN(torch.nn.Module):
     def __init__(self,
@@ -34,10 +37,12 @@ class GCN(torch.nn.Module):
         self.initial_conv = GCNConv(in_channels, embedding_size)
         self.conv1 = GCNConv(embedding_size, embedding_size)
         self.conv2 = GCNConv(embedding_size, embedding_size)
-        # self.conv3 = GCNConv(embedding_size, embedding_size)
+        self.conv3 = GCNConv(embedding_size, embedding_size)
 
         self.lin = Linear(embedding_size*2, embedding_size)
         self.dropout = torch.nn.Dropout(dropout)
+
+        self.prelu = torch.nn.PReLU(device=device)
 
         # Output layer
         self.out = Linear(embedding_size, out_channels)
@@ -49,18 +54,17 @@ class GCN(torch.nn.Module):
 
         # Other Conv layers
         hidden = self.conv1(hidden, edge_index)
-        hidden = F.relu(hidden)
+        hidden = self.prelu(hidden)
         hidden = self.conv2(hidden, edge_index)
-        hidden = F.relu(hidden)
-        # hidden = self.conv3(hidden, edge_index)
-        # hidden = F.relu(hidden)
+        hidden = self.prelu(hidden)
+        hidden = self.conv3(hidden, edge_index)
+        hidden = self.prelu(hidden)
 
         # Global Pooling (stack different aggregations)
         hidden = torch.cat([gmp(hidden, batch_index),
                             gap(hidden, batch_index)], dim=1)
 
         hidden = F.relu(self.lin(hidden))
-
         hidden = self.dropout(hidden)
 
         # Apply a final (linear) classifier.
@@ -68,7 +72,7 @@ class GCN(torch.nn.Module):
 
         # # Scale the output of the sigmoid to the range [1, 100]
         # # Sigmoid outputs (0,1), scale to (1,100)
-        out = torch.sigmoid(out) * 49 + 1
+        out = torch.sigmoid(out) * 14 + 1
 
         return out, hidden
 
@@ -80,11 +84,9 @@ model = GCN(dataset[0].num_features, 1,
 
 # Root mean squared error
 loss_fn = torch.nn.MSELoss()
-optimizer = torch.optim.Adam(model.parameters(), lr=0.001, weight_decay=1e-4)
-scheduler = StepLR(optimizer, step_size=50, gamma=0.9)
+optimizer = torch.optim.Adam(model.parameters(), lr=0.01, weight_decay=1e-4)
+scheduler = StepLR(optimizer, step_size=100, gamma=0.75)
 
-# Use GPU for training
-device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 model = model.to(device)
 
 data_size = len(dataset)
@@ -140,7 +142,7 @@ def test(loader):
 print("Starting training...")
 losses = []
 time = perf_counter()
-for epoch in range(500):
+for epoch in range(1000):
     loss, h = train()
     scheduler.step()
     losses.append(loss)
@@ -149,7 +151,7 @@ for epoch in range(500):
         print(f"Epoch {epoch} | Train Loss {loss} | "
               f"Time {(perf_counter() - time)/60} min")
         time = perf_counter()
-        print('Train Sores: ', test(loader))
+        print('Train Scores: ', test(loader))
         print('Test Scores: ', test(test_loader))
 
 # %%

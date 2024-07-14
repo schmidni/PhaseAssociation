@@ -70,9 +70,9 @@ def find_matching_indices(A, S):
     Parameters
     ----------
     A : np.array
-        Station index of the arrivals.
+        Station index of the arrivals, and the time of the arrivals.
     S : np.array
-        K nearest stations to each station.
+        K nearest stations indexes to each station.
 
     """
     # Get the unique values in A and their corresponding indices
@@ -99,7 +99,7 @@ def find_matching_indices(A, S):
             for match_idx in matching_indices:
                 diff = np.abs(A[idx, 1] - A[match_idx, 1])
 
-                if diff < 1e9:
+                if diff < 0.5e9:
                     result.append((idx, match_idx))
 
     # Convert result list to a numpy array with shape (2, j)
@@ -127,16 +127,16 @@ def transform_knn_stations(arrivals: pd.DataFrame,
     # in the stations dataframe
     arrivals['station_idx'] = arrivals['station'].apply(
         lambda x: stations[stations['id'] == x].index[0])
-    arrivals
+
+    arrivals = arrivals[arrivals['phase'] == 'P']
 
     features = []
 
     time_ = torch.tensor(arrivals['time'].values, dtype=torch.long)
     features.append(min_max_normalize(time_))
-
-    phase = torch.tensor(arrivals['phase'].replace(
-        {'P': '0', 'S': '1'}).astype('int32').values, dtype=torch.int32)
-    features.append(phase)
+    # phase = torch.tensor(arrivals['phase'].replace(
+    #     {'P': '0', 'S': '1'}).astype('int32').values, dtype=torch.int32)
+    # features.append(phase)
     e = torch.tensor(arrivals['e'].values, dtype=torch.float)
     features.append(min_max_normalize(e))
     n = torch.tensor(arrivals['n'].values, dtype=torch.float)
@@ -180,7 +180,7 @@ class PhaseAssociationDataset(InMemoryDataset):
 
         self.stations = pd.read_csv(os.path.join(root, 'raw', 'stations.csv'))
         X = self.stations[['e', 'n', 'u']].values
-        nbrs = NearestNeighbors(n_neighbors=6).fit(X)
+        nbrs = NearestNeighbors(n_neighbors=16).fit(X)
         _, self.nearest_stations = nbrs.kneighbors(X)
 
         super().__init__(root, transform, pre_transform,
