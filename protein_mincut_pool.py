@@ -3,7 +3,7 @@ import time
 
 import numpy as np
 import torch
-from sklearn.metrics import normalized_mutual_info_score as NMI
+from sklearn.metrics import adjusted_rand_score as ARI
 from torch.nn import Linear
 from torch_geometric import utils
 from torch_geometric.loader import DataLoader
@@ -26,9 +26,9 @@ for d in dataset:
 test_dataset = dataset[:n]
 val_dataset = dataset[n:2 * n]
 train_dataset = dataset[2 * n:]
-test_loader = DataLoader(test_dataset, batch_size=20)
-val_loader = DataLoader(val_dataset, batch_size=20)
-train_loader = DataLoader(train_dataset, batch_size=20)
+test_loader = DataLoader(test_dataset, batch_size=1)
+val_loader = DataLoader(val_dataset, batch_size=1)
+train_loader = DataLoader(train_dataset, batch_size=1)
 
 # %%
 # Normalized adjacency matrix
@@ -91,7 +91,7 @@ class Net(torch.nn.Module):
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 # data = data.to(device)
-model = Net([2], "ELU", dataset.num_features, dataset.num_classes).to(device)
+model = Net([12], "ELU", dataset.num_features, dataset.num_classes).to(device)
 
 optimizer = torch.optim.Adam(model.parameters(), lr=1e-3, weight_decay=1e-4)
 
@@ -101,24 +101,25 @@ optimizer = torch.optim.Adam(model.parameters(), lr=1e-3, weight_decay=1e-4)
 def train(epoch):
     model.train()
     loss_all = 0
-
+    ari = 0
     for data in train_loader:
         data = data.to(device)
-        for i in range(10):
+        for i in range(3):
             optimizer.zero_grad()
-            _, mc_loss, o_loss = model(
+            clust, mc_loss, o_loss = model(
                 data.x, data.edge_index, data.edge_weight)
             loss = mc_loss + o_loss
             loss.backward()
             loss_all += data.y.size(0) * float(loss)
             optimizer.step()
-    return loss_all / len(train_dataset)
+            ari += ARI(clust.max(1)[1].cpu(), data.y.cpu())
+    return loss_all / (len(train_dataset)*3), ari/len(train_loader.dataset)/3
 
 
 @torch.no_grad()
 def test(loader):
     model.eval()
-    nmi = 0
+    ari = 0
     loss_all = 0
     for data in loader:
         data = data.to(device)
@@ -126,36 +127,32 @@ def test(loader):
             data.x, data.edge_index, data.edge_weight)
         loss = mc_loss + o_loss
         loss_all += data.y.size(0) * float(loss)
-        nmi += NMI(clust.max(1)[1].cpu(), data.y.cpu())
-    rand_idx = np.random.randint(1, 1001, size=15)
-    print(
-        torch.stack((clust.max(1)[1][rand_idx].cpu(),
-                     data.y[rand_idx].cpu()), 0))
-    return loss_all / len(loader.dataset), nmi / len(loader.dataset)
+        ari += ARI(clust.max(1)[1].cpu(), data.y.cpu())
+
+    return loss_all / len(loader.dataset), ari / len(loader.dataset)
 
 
 times = []
-best_val_nmi = test_nmi = 0
+best_val_ari = test_ari = 0
 best_val_loss = float('inf')
 patience = start_patience = 50
 
 for epoch in range(1, 15001):
     start = time.time()
-    train_loss = train(epoch)
-    _, train_nmi = test(train_loader)
-    val_loss, val_nmi = test(val_loader)
+    train_loss, train_ari = train(epoch)
+    val_loss, val_ari = test(val_loader)
     if val_loss < best_val_loss:
-        test_loss, test_nmi = test(test_loader)
-        best_val_nmi = val_nmi
+        test_loss, test_ari = test(test_loader)
+        best_val_ari = val_ari
         patience = start_patience
     else:
         patience -= 1
         if patience == 0:
             break
     print(f'Epoch: {epoch:03d}, Train Loss: {train_loss:.3f}, '
-          f'Train NMI: {train_nmi:.3f}, Val Loss: {val_loss:.3f}, '
-          f'Val NMI: {val_nmi:.3f}, Test Loss: {test_loss:.3f}, '
-          f'Test NMI: {test_nmi:.3f}')
+          f'Train ARI: {train_ari:.3f}, Val Loss: {val_loss:.3f}, '
+          f'Val ARI: {val_ari:.3f}, Test Loss: {test_loss:.3f}, '
+          f'Test ARI: {test_ari:.3f}')
     times.append(time.time() - start)
 print(f"Median time per epoch: {torch.tensor(times).median():.4f}s")
 
