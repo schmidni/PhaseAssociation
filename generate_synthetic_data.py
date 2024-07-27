@@ -39,16 +39,17 @@ def create_synthetic_data(out_dir: Path,
         arrivals = associations.join(stations.set_index('id'), on='station')
         arrivals = arrivals.drop(columns=['longitude', 'latitude', 'altitude'])
         arrivals.to_csv(f'{out_dir}/arrivals_{i}.csv', index=False)
+        catalog.to_csv(f'{out_dir}/catalog_{i}.csv', index=True)
 
 
 if __name__ == '__main__':
 
     stations = inventory_to_stations('stations/station_cords_blab_VALTER.csv')
     out_dir = Path('data/raw')
-    n_events = 5
-    n_events_fixed = True
+    n_events = 15
+    n_events_fixed = False
     duration = 10
-    n_catalogs = 2000
+    n_catalogs = 100
 
     create_synthetic_data(out_dir,
                           n_catalogs,
