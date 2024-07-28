@@ -15,7 +15,8 @@ def create_synthetic_data(out_dir: Path,
                           n_events: int,
                           n_events_fixed: bool,
                           duration: int,
-                          stations: pd.DataFrame):
+                          stations: pd.DataFrame,
+                          min_events: int = 1):
 
     center = np.array(
         [stations['e'].mean(), stations['n'].mean(), stations['u'].mean()])
@@ -33,7 +34,7 @@ def create_synthetic_data(out_dir: Path,
         n = n_events
         if not n_events_fixed:
             # random integer number
-            n = np.random.randint(1, n_events)
+            n = np.random.randint(min_events, n_events)
         catalog = create_synthetic_catalog(n, duration, *center)
         associations = create_associations(catalog, stations, v_p, v_s, 60)
         arrivals = associations.join(stations.set_index('id'), on='station')
@@ -46,9 +47,10 @@ if __name__ == '__main__':
 
     stations = inventory_to_stations('stations/station_cords_blab_VALTER.csv')
     out_dir = Path('data/raw')
-    n_events = 15
+    min_events = 15
+    n_events = 20
     n_events_fixed = False
-    duration = 10
+    duration = 15
     n_catalogs = 100
 
     create_synthetic_data(out_dir,
@@ -56,4 +58,5 @@ if __name__ == '__main__':
                           n_events,
                           n_events_fixed,
                           duration,
-                          stations)
+                          stations,
+                          min_events=min_events)
