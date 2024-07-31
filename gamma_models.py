@@ -22,11 +22,11 @@ config = {
         (-1, 1),        # depth
         (None, None),   # t
     ),
-    "use_dbscan": False,
-    "dbscan_eps": 5,  # seconds
+    "use_dbscan": True,
+    "dbscan_eps": 0.01,  # seconds
     "dbscan_min_samples": 3,
 
-    "min_picks_per_eq": 3,
+    "min_picks_per_eq": 2,
     "max_sigma11": 4.0,
     "max_sigma22": 2.0,
     "max_sigma12": 2.0
@@ -34,7 +34,7 @@ config = {
 
 # %%
 statistics = ClusterStatistics()
-for i in tqdm.tqdm(range(2)):
+for i in tqdm.tqdm(range(100)):
     arrivals, catalog, stations, reference_time = load_data(i)
     arr_input, stn_input = gamma_preprocess(arrivals, stations)
 

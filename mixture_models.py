@@ -12,7 +12,7 @@ from sklearn.preprocessing import MinMaxScaler, StandardScaler
 from src.clustering.utils import ClusterStatistics, load_data
 
 color_iter = itertools.cycle(
-    ["navy", "c", "cornflowerblue", "gold", "darkorange", "green",
+    ["navy", "c", "cornflowerblue", "gold", "orange", "green",
      "lime", "red", "purple", "blue", "pink", "brown", "black", "gray",
      "magenta", "cyan", "olive", "maroon", "darkslategray", "darkkhaki"])
 
@@ -55,8 +55,11 @@ index = 1
 arrivals, catalog, stations, reference_time = load_data(index)
 
 # %%
-plt.scatter(arrivals['dt'], arrivals['dx'])
-plt.scatter(catalog['dt'], catalog['dx'])
+for i in range(len(np.unique(arrivals['event']))):
+    plt.scatter(arrivals[arrivals['event'] == i]['dt'],
+                arrivals[arrivals['event'] == i]['dx'],
+                color=color_iter.__next__())
+plt.scatter(catalog['dt'], catalog['dx'], color='darkorange', marker='x')
 plt.show()
 
 # %%

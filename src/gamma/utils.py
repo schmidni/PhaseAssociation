@@ -427,8 +427,8 @@ def associate(
         for pi, pr in zip(pick_idx_[pred == i][idx_filter], prob):
             assignment.append((pi, event_idx_value, pr))
 
-        if (event_idx_value + 1) % 100 == 0:
-            print(f"\nAssociated {event_idx_value + 1} events")
+        # if (event_idx_value + 1) % 100 == 0:
+        #     print(f"\nAssociated {event_idx_value + 1} events")
     return events, assignment
 
 

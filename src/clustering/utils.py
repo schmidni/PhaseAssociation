@@ -1,3 +1,4 @@
+import itertools
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -87,15 +88,16 @@ def plot_arrivals(arrivals, cat, cat_pred, labels, labels_pred):
     fig, ax = plt.subplots(2, sharex=True, figsize=(7, 5))
     # fig.suptitle('Vertically stacked subplots')
 
-    colors = ["darkkhaki", "c", "cornflowerblue", "gold", "green",
-              "lime", "red", "purple", "blue", "pink", "brown", "gray",
-              "magenta", "cyan", "olive", "maroon", "darkslategray"]
+    colors = itertools.cycle(
+        ["navy", "c", "cornflowerblue", "gold", "orange", "green",
+         "lime", "red", "purple", "blue", "pink", "brown", "black", "gray",
+         "magenta", "cyan", "olive", "maroon", "darkslategray", "darkkhaki"])
 
     # prediction
     for idx in range(len(np.unique(labels_pred))):
         ax[1].scatter(arrivals.loc[labels_pred == idx, 'dt'] / 1000,
                       arrivals.loc[labels_pred == idx, 'dx'],
-                      color=colors[idx], s=80
+                      color=colors.__next__(), s=80
                       )
 
     ax[1].scatter(arrivals.loc[labels_pred == -1, 'dt'] / 1000,
@@ -108,6 +110,6 @@ def plot_arrivals(arrivals, cat, cat_pred, labels, labels_pred):
     for idx in range(len(np.unique(labels))):
         ax[0].scatter(arrivals.loc[labels == idx, 'dt'] / 1000,
                       arrivals.loc[labels == idx, 'dx'],
-                      color=colors[-idx+1], s=80
+                      color=colors.__next__(), s=80
                       )
     ax[0].scatter(cat['dt'] / 1000, cat['dx'], color='darkorange', marker='x')
