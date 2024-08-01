@@ -40,9 +40,10 @@ def nt_xent_loss(embeddings, labels, temperature=0.5):
     Computes the NT-Xent loss for given embeddings and labels.
 
     Parameters:
-    - embeddings: Tensor of shape (N, D) where N is the number of samples and D is the embedding dimension.
-    - labels: Tensor of shape (N,) containing the labels for the samples.
-    - temperature: The temperature parameter for scaling similarities.
+    - embeddings:   Tensor of shape (N, D) where N is the number of samples
+                    and D is the embedding dimension.
+    - labels:       Tensor of shape (N,) containing the labels for the samples.
+    - temperature:  The temperature parameter for scaling similarities.
 
     Returns:
     - loss: The computed NT-Xent loss.

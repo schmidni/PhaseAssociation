@@ -5,6 +5,7 @@ import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+import tqdm
 from scipy import linalg
 from sklearn import mixture
 from sklearn.preprocessing import MinMaxScaler, StandardScaler
@@ -50,9 +51,16 @@ def plot_results(X, Y_, means, covariances, x, y, index, title):
     plt.title(title)
 
 
+components = 120
+run_samples = 5
+use_columns = ['dt', 'dx']
+covariance_prior = np.diag([1e-5, 1])
+plot_index = 1
+plot_x_feat = 0
+plot_y_feat = 1
+
 # %%
-index = 1
-arrivals, catalog, stations, reference_time = load_data(index)
+arrivals, catalog, stations, reference_time = load_data(plot_index)
 
 # %%
 for i in range(len(np.unique(arrivals['event']))):
@@ -63,7 +71,7 @@ plt.scatter(catalog['dt'], catalog['dx'], color='darkorange', marker='x')
 plt.show()
 
 # %%
-X = arrivals[['dt', 'dx']].to_numpy()
+X = arrivals[use_columns].to_numpy()
 
 standard_scaler = StandardScaler()
 minmax_scaler = MinMaxScaler()
@@ -71,9 +79,7 @@ minmax_scaler = MinMaxScaler()
 # X = minmax_scaler.fit_transform(X)
 # X[:,2] = minmax_scaler.fit_transform(X[:,2].reshape(-1, 1)).flatten()
 # X[:,2] = standard_scaler.fit_transform(X[:,2].reshape(-1, 1)).flatten()
-x_feat = 0
-y_feat = 1
-components = 20
+
 
 gmm = mixture.GaussianMixture(
     n_components=components,
@@ -86,8 +92,8 @@ plot_results(X,
              gmm_pred,
              gmm.means_,
              gmm.covariances_,
-             x_feat,
-             y_feat,
+             plot_x_feat,
+             plot_y_feat,
              0,
              "Gaussian Mixture")
 
@@ -98,7 +104,7 @@ dpgmm = mixture.BayesianGaussianMixture(
     max_iter=500,
     covariance_type='full',
     weight_concentration_prior_type='dirichlet_process',
-    covariance_prior=np.array([[1e-5, 0], [0, 1]])
+    covariance_prior=covariance_prior
 )
 dpgmm.fit(X)
 dpgmm_pred = dpgmm.predict(X)
@@ -107,8 +113,8 @@ plot_results(X,
              dpgmm_pred,
              dpgmm.means_,
              dpgmm.covariances_,
-             x_feat,
-             y_feat,
+             plot_x_feat,
+             plot_y_feat,
              1,
              "Bayesian Gaussian Mixture with a Dirichlet process prior",
              )
@@ -134,9 +140,9 @@ components = 20
 gmm_metrics = ClusterStatistics()
 dpgmm_metrics = ClusterStatistics()
 
-for index in range(100):
-    arrivals = pd.read_csv(f'data/raw/arrivals_{index}.csv')
-    catalog = pd.read_csv(f'data/raw/catalog_{index}.csv', index_col=0)
+for i in tqdm.tqdm(range(run_samples)):
+    arrivals = pd.read_csv(f'data/raw/arrivals_{i}.csv')
+    catalog = pd.read_csv(f'data/raw/catalog_{i}.csv', index_col=0)
     catalog['time'] = pd.to_datetime(catalog['time'])
 
     reference_time = catalog['time'].min().floor('min')
