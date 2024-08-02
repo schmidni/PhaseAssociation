@@ -172,7 +172,7 @@ def transform_knn_stations(arrivals: pd.DataFrame,
     return data
 
 
-class PhaseAssociationDataset(InMemoryDataset):
+class PhaseAssociationGraphDataset(InMemoryDataset):
     def __init__(self,
                  root,
                  transform=None,
