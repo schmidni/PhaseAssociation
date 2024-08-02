@@ -47,11 +47,11 @@ if __name__ == '__main__':
 
     stations = inventory_to_stations('stations/station_cords_blab_VALTER.csv')
     out_dir = Path('data/raw')
-    min_events = 60
-    n_events = 120
-    n_events_fixed = False
+    min_events = 15
+    n_events = 15
+    n_events_fixed = True
     duration = 15
-    n_catalogs = 100
+    n_catalogs = 2000
 
     create_synthetic_data(out_dir,
                           n_catalogs,
