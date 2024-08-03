@@ -54,7 +54,7 @@ def sweeping_over_I_J_K(u, I, J, f, h):
 
 @njit
 def sweeping(u, v, h):
-    f = 1.0 / v  ## slowness
+    f = 1.0 / v  # slowness
 
     m, n = u.shape
     # I = list(range(m))
@@ -127,7 +127,7 @@ def _interp(time_table, r, z, rgrid0, zgrid0, nr, nz, h):
     ir1 = ir0 + 1
     iz1 = iz0 + 1
 
-    ## https://en.wikipedia.org/wiki/Bilinear_interpolation
+    # https://en.wikipedia.org/wiki/Bilinear_interpolation
     x1 = ir0 * h + rgrid0
     x2 = ir1 * h + rgrid0
     z1 = iz0 * h + zgrid0
@@ -154,7 +154,8 @@ def _interp(time_table, r, z, rgrid0, zgrid0, nr, nz, h):
 
 
 def traveltime(event_loc, station_loc, phase_type, eikonal):
-    r = np.linalg.norm(event_loc[:, :2] - station_loc[:, :2], axis=-1, keepdims=False)
+    r = np.linalg.norm(event_loc[:, :2] -
+                       station_loc[:, :2], axis=-1, keepdims=False)
     z = event_loc[:, 2] - station_loc[:, 2]
 
     rgrid0 = eikonal["rgrid"][0]
@@ -168,15 +169,18 @@ def traveltime(event_loc, station_loc, phase_type, eikonal):
     p_index = phase_type == "p"
     s_index = phase_type == "s"
     tt = np.zeros(len(phase_type), dtype=np.float32)
-    tt[phase_type == "p"] = _interp(eikonal["up"], r[p_index], z[p_index], rgrid0, zgrid0, nr, nz, h)
-    tt[phase_type == "s"] = _interp(eikonal["us"], r[s_index], z[s_index], rgrid0, zgrid0, nr, nz, h)
+    tt[phase_type == "p"] = _interp(
+        eikonal["up"], r[p_index], z[p_index], rgrid0, zgrid0, nr, nz, h)
+    tt[phase_type == "s"] = _interp(
+        eikonal["us"], r[s_index], z[s_index], rgrid0, zgrid0, nr, nz, h)
     tt = tt[:, np.newaxis]
 
     return tt
 
 
 def grad_traveltime(event_loc, station_loc, phase_type, eikonal):
-    r = np.linalg.norm(event_loc[:, :2] - station_loc[:, :2], axis=-1, keepdims=False)
+    r = np.linalg.norm(event_loc[:, :2] -
+                       station_loc[:, :2], axis=-1, keepdims=False)
     z = event_loc[:, 2] - station_loc[:, 2]
 
     rgrid0 = eikonal["rgrid"][0]
@@ -191,12 +195,17 @@ def grad_traveltime(event_loc, station_loc, phase_type, eikonal):
     s_index = phase_type == "s"
     dt_dr = np.zeros(len(phase_type))
     dt_dz = np.zeros(len(phase_type))
-    dt_dr[p_index] = _interp(eikonal["grad_up"][0], r[p_index], z[p_index], rgrid0, zgrid0, nr, nz, h)
-    dt_dr[s_index] = _interp(eikonal["grad_us"][0], r[s_index], z[s_index], rgrid0, zgrid0, nr, nz, h)
-    dt_dz[p_index] = _interp(eikonal["grad_up"][1], r[p_index], z[p_index], rgrid0, zgrid0, nr, nz, h)
-    dt_dz[s_index] = _interp(eikonal["grad_us"][1], r[s_index], z[s_index], rgrid0, zgrid0, nr, nz, h)
+    dt_dr[p_index] = _interp(eikonal["grad_up"][0],
+                             r[p_index], z[p_index], rgrid0, zgrid0, nr, nz, h)
+    dt_dr[s_index] = _interp(eikonal["grad_us"][0],
+                             r[s_index], z[s_index], rgrid0, zgrid0, nr, nz, h)
+    dt_dz[p_index] = _interp(eikonal["grad_up"][1],
+                             r[p_index], z[p_index], rgrid0, zgrid0, nr, nz, h)
+    dt_dz[s_index] = _interp(eikonal["grad_us"][1],
+                             r[s_index], z[s_index], rgrid0, zgrid0, nr, nz, h)
 
-    dr_dxy = (event_loc[:, :2] - station_loc[:, :2]) / (r[:, np.newaxis] + 1e-6)
+    dr_dxy = (event_loc[:, :2] - station_loc[:, :2]) / \
+        (r[:, np.newaxis] + 1e-6)
     dt_dxy = dt_dr[:, np.newaxis] * dr_dxy
 
     grad = np.column_stack((dt_dxy, dt_dz[:, np.newaxis]))
@@ -213,19 +222,21 @@ def calc_time(event_loc, station_loc, phase_type, vel={"p": 6.0, "s": 6.0 / 1.75
 
     if eikonal is None:
         v = np.array([vel[x] for x in phase_type])[:, np.newaxis]
-        tt = np.linalg.norm(ev_loc - station_loc, axis=-1, keepdims=True) / v + ev_t
+        tt = np.linalg.norm(ev_loc - station_loc, axis=-
+                            1, keepdims=True) / v + ev_t
     else:
         tt = traveltime(event_loc, station_loc, phase_type, eikonal) + ev_t
     return tt
 
 
 def calc_mag(data, event_loc, station_loc, weight, min=-2, max=8):
-    dist = np.linalg.norm(event_loc[:, :-1] - station_loc, axis=-1, keepdims=True)
+    dist = np.linalg.norm(event_loc[:, :-1] -
+                          station_loc, axis=-1, keepdims=True)
     # mag_ = ( data - 2.48 + 2.76 * np.log10(dist) )
-    ## Picozzi et al. (2018) A rapid response magnitude scale...
+    # Picozzi et al. (2018) A rapid response magnitude scale...
     c0, c1, c2, c3 = 1.08, 0.93, -0.015, -1.68
     mag_ = (data - c0 - c3 * np.log10(np.maximum(dist, 0.1))) / c1 + 3.5
-    ## Atkinson, G. M. (2015). Ground-Motion Prediction Equation...
+    # Atkinson, G. M. (2015). Ground-Motion Prediction Equation...
     # c0, c1, c2, c3, c4 = (-4.151, 1.762, -0.09509, -1.669, -0.0006)
     # mag_ = (data - c0 - c3*np.log10(dist))/c1
     # mag = np.sum(mag_ * weight) / (np.sum(weight)+1e-6)
@@ -240,12 +251,13 @@ def calc_mag(data, event_loc, station_loc, weight, min=-2, max=8):
 
 
 def calc_amp(mag, event_loc, station_loc):
-    dist = np.linalg.norm(event_loc[:, :-1] - station_loc, axis=-1, keepdims=True)
+    dist = np.linalg.norm(event_loc[:, :-1] -
+                          station_loc, axis=-1, keepdims=True)
     # logA = mag + 2.48 - 2.76 * np.log10(dist)
-    ## Picozzi et al. (2018) A rapid response magnitude scale...
+    # Picozzi et al. (2018) A rapid response magnitude scale...
     c0, c1, c2, c3 = 1.08, 0.93, -0.015, -1.68
     logA = c0 + c1 * (mag - 3.5) + c3 * np.log10(np.maximum(dist, 0.1))
-    ## Atkinson, G. M. (2015). Ground-Motion Prediction Equation...
+    # Atkinson, G. M. (2015). Ground-Motion Prediction Equation...
     # c0, c1, c2, c3, c4 = (-4.151, 1.762, -0.09509, -1.669, -0.0006)
     # logA = c0 + c1*mag + c3*np.log10(dist)
     # (Watanabe, 1971) https://www.jstage.jst.go.jp/article/zisin1948/24/3/24_3_189/_pdf/-char/ja
@@ -275,7 +287,8 @@ def huber_loss_grad(
     # gradient
     if eikonal is None:
         v = np.array([vel[p] for p in phase_type])[:, np.newaxis]
-        dist = np.linalg.norm(event_loc[:, :-1] - station_loc, axis=-1, keepdims=True)
+        dist = np.linalg.norm(
+            event_loc[:, :-1] - station_loc, axis=-1, keepdims=True)
         J[:, :-1] = (event_loc[:, :-1] - station_loc) / (dist + 1e-6) / v
     else:
         grad = grad_traveltime(event_loc, station_loc, phase_type, eikonal)
@@ -318,7 +331,8 @@ def calc_loc(
 def initialize_eikonal(config):
     path = Path("./eikonal")
     path.mkdir(exist_ok=True)
-    rlim = [0, np.sqrt((config["xlim"][1] - config["xlim"][0]) ** 2 + (config["ylim"][1] - config["ylim"][0]) ** 2)]
+    rlim = [0, np.sqrt((config["xlim"][1] - config["xlim"][0])
+                       ** 2 + (config["ylim"][1] - config["ylim"][0]) ** 2)]
     zlim = config["zlim"]
     h = config["h"]
 
@@ -402,27 +416,30 @@ def initialize_centers(X, phase_type, centers_init, station_locs, random_state):
     means = np.zeros([n_components, n_samples, n_features])
     for i in range(n_components):
         if n_features == 1:  # (time,)
-            means[i, :, :] = calc_time(centers_init[i : i + 1, :], station_locs, phase_type)
+            means[i, :, :] = calc_time(
+                centers_init[i: i + 1, :], station_locs, phase_type)
         elif n_features == 2:  # (time, amp)
-            means[i, :, 0:1] = calc_time(centers_init[i : i + 1, :-1], station_locs, phase_type)
+            means[i, :, 0:1] = calc_time(
+                centers_init[i: i + 1, :-1], station_locs, phase_type)
             means[i, :, 1:2] = X[:, 1:2]
             # means[i, :, 1:2] = calc_amp(self.centers_init[i, -1:], self.centers_init[i:i+1, :-1], self.station_locs)
         else:
             raise ValueError(f"n_features = {n_features} > 2!")
 
-    ## performance is not good
+    # performance is not good
     # resp = np.zeros((n_samples, self.n_components))
     # dist = np.sum(np.abs(means - X), axis=-1).T # (n_components, n_samples, n_features) -> (n_samples, n_components)
     # resp[np.arange(n_samples), np.argmax(dist, axis=1)] = 1.0
 
-    ## performance is ok
+    # performance is ok
     # sigma = np.array([1.0,1.0])
     # prob = np.sum(1.0/sigma * np.exp( - (means - X) ** 2 / (2 * sigma**2)), axis=-1).T # (n_components, n_samples, n_features) -> (n_samples, n_components)
     # prob_sum = np.sum(prob, axis=1, keepdims=True)
     # prob_sum[prob_sum == 0] = 1.0
     # resp = prob / prob_sum
 
-    dist = np.linalg.norm(means - X, axis=-1).T  # (n_components, n_samples, n_features) -> (n_samples, n_components)
+    # (n_components, n_samples, n_features) -> (n_samples, n_components)
+    dist = np.linalg.norm(means - X, axis=-1).T
     resp = np.exp(-dist)
     resp_sum = resp.sum(axis=1, keepdims=True)
     resp_sum[resp_sum == 0] = 1.0
@@ -434,20 +451,22 @@ def initialize_centers(X, phase_type, centers_init, station_locs, random_state):
 
     if n_features == 2:
         for i in range(n_components):
-            centers[i, -1:] = calc_mag(X[:, 1:2], centers_init[i : i + 1, :-1], station_locs, resp[:, i : i + 1])
+            centers[i, -1:] = calc_mag(X[:, 1:2], centers_init[i: i + 1,
+                                       :-1], station_locs, resp[:, i: i + 1])
 
     return resp, centers, means
 
 
 #########################################################################################################################
-## L2 norm
+# L2 norm
 def diff_and_grad(vars, data, station_locs, phase_type, vel={"p": 6.0, "s": 6.0 / 1.75}):
     """
     data: (n_sample, t)
     """
     v = np.array([vel[p] for p in phase_type])[:, np.newaxis]
     # loc, t = vars[:,:-1], vars[:,-1:]
-    dist = np.sqrt(np.sum((station_locs - vars[:, :-1]) ** 2, axis=1, keepdims=True))
+    dist = np.sqrt(
+        np.sum((station_locs - vars[:, :-1]) ** 2, axis=1, keepdims=True))
     y = dist / v - (data - vars[:, -1:])
     J = np.zeros([data.shape[0], vars.shape[1]])
     J[:, :-1] = (vars[:, :-1] - station_locs) / (dist + 1e-6) / v
@@ -470,7 +489,7 @@ def newton_method(
     return vars
 
 
-## l1 norm
+# l1 norm
 # def loss_and_grad(vars, data, station_locs, phase_type, weight, vel={"p":6.0, "s":6.0/1.75}):
 
 #     v = np.array([vel[p] for p in phase_type])[:, np.newaxis]

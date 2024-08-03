@@ -7,16 +7,17 @@
 import warnings
 from abc import ABCMeta, abstractmethod
 from time import time
+
 import numpy as np
 from scipy.special import logsumexp
 from sklearn import cluster
-from sklearn.base import BaseEstimator
-from sklearn.base import DensityMixin
+from sklearn.base import BaseEstimator, DensityMixin
 from sklearn.exceptions import ConvergenceWarning
 from sklearn.utils import check_array, check_random_state
 from sklearn.utils.validation import check_is_fitted
 
 from .seismic_ops import initialize_centers
+
 
 def _check_shape(param, param_shape, name):
     """Validate the shape of the input parameter 'param'.
@@ -70,7 +71,7 @@ class BaseMixture(DensityMixin, BaseEstimator, metaclass=ABCMeta):
 
     def __init__(self, n_components, tol, reg_covar,
                  max_iter, n_init, init_params, random_state, warm_start,
-                 verbose, verbose_interval, 
+                 verbose, verbose_interval,
                  dummy_comp=False, dummy_prob=0.01, dummy_quantile=0.1):
         self.n_components = n_components
         self.tol = tol
@@ -159,7 +160,8 @@ class BaseMixture(DensityMixin, BaseEstimator, metaclass=ABCMeta):
             resp /= resp.sum(axis=1)[:, np.newaxis]
         elif self.init_params == 'centers':
             # resp = self._initialize_centers(X, random_state)
-            resp, centers, means = initialize_centers(X, self.phase_type, self.centers_init, self.station_locs, random_state)
+            resp, centers, means = initialize_centers(
+                X, self.phase_type, self.centers_init, self.station_locs, random_state)
             self.centers_init = centers
         else:
             raise ValueError("Unimplemented initialization method '%s'"
@@ -233,7 +235,7 @@ class BaseMixture(DensityMixin, BaseEstimator, metaclass=ABCMeta):
         self._check_initial_parameters(X)
 
         # if we enable warm_start, we will have a unique initialisation
-        do_init = not(self.warm_start and hasattr(self, 'converged_'))
+        do_init = not (self.warm_start and hasattr(self, 'converged_'))
         n_init = self.n_init if do_init else 1
 
         max_lower_bound = -np.infty
@@ -264,7 +266,7 @@ class BaseMixture(DensityMixin, BaseEstimator, metaclass=ABCMeta):
                 if abs(change) < self.tol:
                     self.converged_ = True
                     break
-            
+
             self._print_verbose_msg_init_end(lower_bound)
 
             if lower_bound > max_lower_bound:

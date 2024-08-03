@@ -11,14 +11,12 @@ from sklearn.utils import check_array
 from sklearn.utils.validation import _deprecate_positional_args
 
 from ._base import BaseMixture, _check_shape
-from ._gaussian_mixture import (
-    _check_precision_matrix,
-    _check_precision_positivity,
-    _compute_log_det_cholesky,
-    _compute_precision_cholesky,
-    _estimate_gaussian_parameters,
-    _estimate_log_gaussian_prob,
-)
+from ._gaussian_mixture import (_check_precision_matrix,
+                                _check_precision_positivity,
+                                _compute_log_det_cholesky,
+                                _compute_precision_cholesky,
+                                _estimate_gaussian_parameters,
+                                _estimate_log_gaussian_prob)
 from .seismic_ops import *
 
 
@@ -321,7 +319,7 @@ class BayesianGaussianMixture(BaseMixture):
                  degrees_of_freedom_prior=None, covariance_prior=None,
                  random_state=None, warm_start=False, verbose=0,
                  station_locs=None, phase_type=None, phase_weight=None, centers_init=None,
-                 vel={"p":6.0, "s":6.0/1.75}, eikonal=None,
+                 vel={"p": 6.0, "s": 6.0/1.75}, eikonal=None,
                  dummy_comp=False, dummy_prob=0.01, dummy_quantile=0.1,
                  loss_type="l1", bounds=None, max_covar=None,
                  verbose_interval=10):
@@ -341,11 +339,11 @@ class BayesianGaussianMixture(BaseMixture):
         self.covariance_prior = covariance_prior
         self.centers_init = centers_init
         if station_locs is None:
-            raise("Missing: station_locs")
+            raise ("Missing: station_locs")
         if phase_type is None:
-            raise("Missing: phase_type")
+            raise ("Missing: phase_type")
         if phase_weight is None:
-            phase_weight = np.ones([len(phase_type),1])
+            phase_weight = np.ones([len(phase_type), 1])
         self.vel = vel
         self.station_locs = station_locs
         self.phase_type = np.squeeze(phase_type)
@@ -383,14 +381,15 @@ class BayesianGaussianMixture(BaseMixture):
 
         n_samples, n_features = X.shape
         if n_features > 2:
-            raise ValueError(f"n_features = {n_features} > 2! Only support 2 features (time, amplitude)")
-        assert(self.covariance_type=='full')
-        assert(self.station_locs.shape[0] == n_samples)
-        assert(self.loss_type in ["l1", "l2"])
+            raise ValueError(
+                f"n_features = {n_features} > 2! Only support 2 features (time, amplitude)")
+        assert (self.covariance_type == 'full')
+        assert (self.station_locs.shape[0] == n_samples)
+        assert (self.loss_type in ["l1", "l2"])
         _check_shape(self.phase_type, (n_samples, ), 'phase_type')
         _check_shape(self.phase_weight, (n_samples, ), 'phase_type')
         if self.init_params == "centers":
-            assert(self.centers_init is not None)
+            assert (self.centers_init is not None)
 
     def _check_weights_parameters(self):
         """Check the parameter of the Dirichlet distribution."""
@@ -489,7 +488,6 @@ class BayesianGaussianMixture(BaseMixture):
                              "should be greater than 0., but got %.3f."
                              % self.covariance_prior)
 
-
     # def _initialize_centers(self, X, random_state):
 
     #     n_samples, n_features = X.shape
@@ -538,7 +536,7 @@ class BayesianGaussianMixture(BaseMixture):
         """
         nk, xk, sk, centers = _estimate_gaussian_parameters(
             X, resp, self.reg_covar, self.covariance_type,
-            self.station_locs, self.phase_type, vel=self.vel, loss_type=self.loss_type, 
+            self.station_locs, self.phase_type, vel=self.vel, loss_type=self.loss_type,
             centers_prev=self.centers_init, bounds=self.bounds, eikonal=self.eikonal)
 
         self._estimate_weights(nk)
@@ -625,17 +623,19 @@ class BayesianGaussianMixture(BaseMixture):
         # the correct formula
         self.degrees_of_freedom_ = self.degrees_of_freedom_prior_ + nk
 
-        self.covariances_ = np.empty((self.n_components, n_features, n_features))
+        self.covariances_ = np.empty(
+            (self.n_components, n_features, n_features))
 
         # for k in range(self.n_components):
-            # diff = xk[k] - self.mean_prior_
-            # self.covariances_[k] = (self.covariance_prior_ + nk[k] * sk[k] +
-            #                         nk[k] * self.mean_precision_prior_ /
-            #                         # self.mean_precision_[k] * np.outer(diff, diff))
-            #                         self.mean_precision_[k] * np.dot(diff.T, diff)/n_samples)
+        # diff = xk[k] - self.mean_prior_
+        # self.covariances_[k] = (self.covariance_prior_ + nk[k] * sk[k] +
+        #                         nk[k] * self.mean_precision_prior_ /
+        #                         # self.mean_precision_[k] * np.outer(diff, diff))
+        #                         self.mean_precision_[k] * np.dot(diff.T, diff)/n_samples)
         # print(f"{self.covariance_prior_.shape = }", f"{sk.shape = }", f"{nk.shape = }")
-        self.covariances_ = self.covariance_prior_[np.newaxis, :, :] + nk[:, np.newaxis, np.newaxis] * sk
-                                    
+        self.covariances_ = self.covariance_prior_[
+            np.newaxis, :, :] + nk[:, np.newaxis, np.newaxis] * sk
+
         # Contrary to the original bishop book, we normalize the covariances
         self.covariances_ /= (
             self.degrees_of_freedom_[:, np.newaxis, np.newaxis])
@@ -670,7 +670,7 @@ class BayesianGaussianMixture(BaseMixture):
         # Contrary to the original bishop book, we normalize the covariances
         self.covariances_ /= self.degrees_of_freedom_
 
-        raise # not implemented
+        raise  # not implemented
 
     def _estimate_wishart_diag(self, nk, xk, sk):
         """Estimate the diag Wishart distribution parameters.
@@ -701,7 +701,7 @@ class BayesianGaussianMixture(BaseMixture):
         # Contrary to the original bishop book, we normalize the covariances
         self.covariances_ /= self.degrees_of_freedom_[:, np.newaxis]
 
-        raise # not implemented
+        raise  # not implemented
 
     def _estimate_wishart_spherical(self, nk, xk, sk):
         """Estimate the spherical Wishart distribution parameters.
@@ -732,7 +732,7 @@ class BayesianGaussianMixture(BaseMixture):
         # Contrary to the original bishop book, we normalize the covariances
         self.covariances_ /= self.degrees_of_freedom_
 
-        raise # not implemented
+        raise  # not implemented
 
     def _m_step(self, X, log_resp):
         """M step.
@@ -749,7 +749,7 @@ class BayesianGaussianMixture(BaseMixture):
 
         nk, xk, sk, self.centers_ = _estimate_gaussian_parameters(
             X, np.exp(log_resp), self.reg_covar, self.covariance_type,
-            self.station_locs, self.phase_type, vel=self.vel, loss_type=self.loss_type, 
+            self.station_locs, self.phase_type, vel=self.vel, loss_type=self.loss_type,
             centers_prev=self.centers_, bounds=self.bounds, eikonal=self.eikonal)
         self._estimate_weights(nk)
         self._estimate_means(nk, xk)
@@ -778,9 +778,10 @@ class BayesianGaussianMixture(BaseMixture):
 
         if self.dummy_comp:
             # print(np.quantile(np.max(log_gauss[:,:-1], axis=1), self.dummy_quantile),  np.log(self.dummy_prob))
-            log_gauss[:,-1] = min(np.quantile(np.max(log_gauss[:,:-1], axis=1), self.dummy_quantile),  np.log(self.dummy_prob))
+            log_gauss[:, -1] = min(np.quantile(np.max(log_gauss[:, :-1], axis=1),
+                                   self.dummy_quantile),  np.log(self.dummy_prob))
 
-        log_gauss += np.log(self.phase_weight)[:,np.newaxis]
+        log_gauss += np.log(self.phase_weight)[:, np.newaxis]
 
         log_lambda = n_features * np.log(2.) + np.sum(digamma(
             .5 * (self.degrees_of_freedom_ -
