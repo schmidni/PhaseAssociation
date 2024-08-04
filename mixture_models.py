@@ -1,85 +1,42 @@
 # %%
-import itertools
-
-import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
-import pandas as pd
 import tqdm
-from scipy import linalg
 from sklearn import mixture
-from sklearn.preprocessing import MinMaxScaler, StandardScaler
 
-from src.clustering.utils import ClusterStatistics, load_data
+from src.clustering.dataset import PhasePicksDataset
+from src.clustering.utils import ClusterStatistics, color_iter, plot_clusters
 
-color_iter = itertools.cycle(
-    ["navy", "c", "cornflowerblue", "gold", "orange", "green",
-     "lime", "red", "purple", "blue", "pink", "brown", "black", "gray",
-     "magenta", "cyan", "olive", "maroon", "darkslategray", "darkkhaki"])
-
-
-def plot_results(X, Y_, means, covariances, x, y, index, title):
-    splot = plt.subplot(2, 1, 1 + index)
-    for i, (mean, covar, color) in enumerate(
-            zip(means, covariances, color_iter)):
-        if covar.ndim < 2:
-            covar = np.diag(covar)
-        # use advanced indexing and broadcasting to select
-        # the rows and columns corresponding to x and y
-        covar = covar[np.ix_([x, y], [x, y])]
-        v, w = linalg.eigh(covar)
-        v = 2.0 * np.sqrt(2.0) * np.sqrt(v)
-        u = w[0] / linalg.norm(w[0])
-        # as the DP will not use every component it has access to
-        # unless it needs it, we shouldn't plot the redundant
-        # components.
-        if not np.any(Y_ == i):
-            continue
-        plt.scatter(X[Y_ == i, x], X[Y_ == i, y], 0.8, color=color)
-
-        # Plot an ellipse to show the Gaussian component
-        angle = np.arctan(u[1] / u[0])
-        angle = 180.0 * angle / np.pi  # convert to degrees
-        ell = mpl.patches.Ellipse(
-            (mean[x], mean[y]), v[0], v[1], angle=180.0 + angle, color=color)
-        ell.set_clip_box(splot.bbox)
-        ell.set_alpha(0.5)
-        splot.add_artist(ell)
-
-    plt.xticks(())
-    plt.yticks(())
-    plt.title(title)
-
-
-components = 120
 run_samples = 5
-use_columns = ['dt', 'dx']
+use_columns = ['time', 'dx']
 covariance_prior = np.diag([1e-5, 1])
 plot_index = 1
 plot_x_feat = 0
 plot_y_feat = 1
 
-# %%
-arrivals, catalog, stations, reference_time = load_data(plot_index)
+
+dataset = PhasePicksDataset(
+    root_dir='data/raw',
+    stations_file='stations.csv',
+    file_mask='arrivals_*.csv',
+    catalog_mask='catalog_*.csv'
+)
+
+data = dataset[plot_index]
+components = len(np.unique(data.y))
+data.x['dx'] = PhasePicksDataset.get_distance(data.x)
 
 # %%
-for i in range(len(np.unique(arrivals['event']))):
-    plt.scatter(arrivals[arrivals['event'] == i]['dt'],
-                arrivals[arrivals['event'] == i]['dx'],
+for i in range(len(np.unique(data.y))):
+    plt.scatter(data.x[data.y == i]['time'],
+                data.x[data.y == i]['dx'],
                 color=color_iter.__next__())
-plt.scatter(catalog['dt'], catalog['dx'], color='darkorange', marker='x')
+plt.scatter(data.catalog['time'], PhasePicksDataset.get_distance(data.catalog),
+            color='darkorange', marker='x')
 plt.show()
 
 # %%
-X = arrivals[use_columns].to_numpy()
-
-standard_scaler = StandardScaler()
-minmax_scaler = MinMaxScaler()
-# X = standard_scaler.fit_transform(X)
-# X = minmax_scaler.fit_transform(X)
-# X[:,2] = minmax_scaler.fit_transform(X[:,2].reshape(-1, 1)).flatten()
-# X[:,2] = standard_scaler.fit_transform(X[:,2].reshape(-1, 1)).flatten()
-
+X = data.x[use_columns].to_numpy()
 
 gmm = mixture.GaussianMixture(
     n_components=components,
@@ -88,19 +45,19 @@ gmm = mixture.GaussianMixture(
 gmm.fit(X)
 gmm_pred = gmm.predict(X)
 
-plot_results(X,
-             gmm_pred,
-             gmm.means_,
-             gmm.covariances_,
-             plot_x_feat,
-             plot_y_feat,
-             0,
-             "Gaussian Mixture")
+plot_clusters(X,
+              gmm_pred,
+              gmm.means_,
+              gmm.covariances_,
+              plot_x_feat,
+              plot_y_feat,
+              0,
+              "Gaussian Mixture")
 
 dpgmm = mixture.BayesianGaussianMixture(
     n_components=components,
     weight_concentration_prior=1/components,
-    n_init=3,
+    n_init=1,
     max_iter=500,
     covariance_type='full',
     weight_concentration_prior_type='dirichlet_process',
@@ -109,19 +66,19 @@ dpgmm = mixture.BayesianGaussianMixture(
 dpgmm.fit(X)
 dpgmm_pred = dpgmm.predict(X)
 
-plot_results(X,
-             dpgmm_pred,
-             dpgmm.means_,
-             dpgmm.covariances_,
-             plot_x_feat,
-             plot_y_feat,
-             1,
-             "Bayesian Gaussian Mixture with a Dirichlet process prior",
-             )
+plot_clusters(X,
+              dpgmm_pred,
+              dpgmm.means_,
+              dpgmm.covariances_,
+              plot_x_feat,
+              plot_y_feat,
+              1,
+              "Bayesian Gaussian Mixture with a Dirichlet process prior",
+              )
 
 plt.show()
 
-labels = arrivals['event'].to_numpy()
+labels = data.y.to_numpy()
 gmm_metrics = ClusterStatistics()
 gmm_metrics.add(labels, gmm_pred)
 dpgmm_metrics = ClusterStatistics()
@@ -135,41 +92,26 @@ print(f"DPGMM ARI: {dpgmm_metrics.ari()}, "
       f"Recall: {dpgmm_metrics.recall()}")
 
 # %%
-components = 20
-
 gmm_metrics = ClusterStatistics()
 dpgmm_metrics = ClusterStatistics()
 
-for i in tqdm.tqdm(range(run_samples)):
-    arrivals = pd.read_csv(f'data/raw/arrivals_{i}.csv')
-    catalog = pd.read_csv(f'data/raw/catalog_{i}.csv', index_col=0)
-    catalog['time'] = pd.to_datetime(catalog['time'])
-
-    reference_time = catalog['time'].min().floor('min')
-
-    catalog['dt'] = (catalog['time'] -
-                     reference_time).dt.total_seconds() * 1000
-    catalog['dx'] = np.sqrt(
-        catalog['e']**2 + catalog['n']**2 + catalog['u']**2)
-
-    arrivals['time'] = pd.to_datetime(arrivals['time'])
-    arrivals['dt'] = (arrivals['time'] -
-                      reference_time).dt.total_seconds() * 1000
-    arrivals['dx'] = np.sqrt(
-        arrivals['e']**2 + arrivals['n']**2 + arrivals['u']**2)
-
-    X = arrivals[['dt', 'dx']].to_numpy()
+for i, data in enumerate(tqdm.tqdm(dataset)):
+    X = data.x.copy()
+    X['dx'] = PhasePicksDataset.get_distance(X)
+    X = X[use_columns].to_numpy()
 
     gmm.fit(X)
     gmm_pred = gmm.predict(X)
+
     dpgmm.fit(X)
     dpgmm_pred = dpgmm.predict(X)
 
-    labels = arrivals['event'].to_numpy()
+    labels = data.y.to_numpy()
 
     gmm_metrics.add(labels, gmm_pred)
     dpgmm_metrics.add(labels, dpgmm_pred)
-
+    if i == 2:
+        break
 
 print(f"GMM ARI: {gmm_metrics.ari()}, "
       f"Accuracy: {gmm_metrics.accuracy()}, "
@@ -179,3 +121,5 @@ print(f"DPGMM ARI: {dpgmm_metrics.ari()}, "
       f"Accuracy: {dpgmm_metrics.accuracy()}, "
       f"Precision: {dpgmm_metrics.precision()}, "
       f"Recall: {dpgmm_metrics.recall()}")
+
+# %%

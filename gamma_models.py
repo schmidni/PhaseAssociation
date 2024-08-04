@@ -1,10 +1,10 @@
 # %%
-import numpy as np
 import pandas as pd
 import tqdm
 
-from src.clustering.utils import (ClusterStatistics, gamma_preprocess,
-                                  load_data, plot_arrivals)
+from src.clustering.dataset import (GaMMAPickFormat, GaMMAStationFormat,
+                                    PhasePicksDataset)
+from src.clustering.utils import ClusterStatistics, plot_arrivals
 from src.gamma.utils import association
 
 config = {
@@ -34,46 +34,64 @@ config = {
 
 # %%
 statistics = ClusterStatistics()
-for i in tqdm.tqdm(range(100)):
-    arrivals, catalog, stations, reference_time = load_data(i)
-    arr_input, stn_input = gamma_preprocess(arrivals, stations)
 
+ds = PhasePicksDataset(
+    root_dir='data/raw',
+    stations_file='stations.csv',
+    file_mask='arrivals_*.csv',
+    catalog_mask='catalog_*.csv',
+    transform=GaMMAPickFormat(),
+    station_transform=GaMMAStationFormat()
+)
+
+for sample in tqdm.tqdm(ds):
     cat_gmma, assoc_gmma = association(
-        arr_input, stn_input, config, method=config["method"])
+        sample.x, ds.stations, config, method=config["method"])
 
     cat_gmma = pd.DataFrame(cat_gmma)
-
-    cat_gmma['time'] = pd.to_datetime(cat_gmma['time'])
-    cat_gmma['dt'] = (cat_gmma['time'] -
-                      reference_time).dt.total_seconds() * 1000
-    cat_gmma['dx'] = np.sqrt((cat_gmma['x(km)']*1000)**2 +
-                             (cat_gmma['y(km)']*1000)**2 +
-                             (cat_gmma['z(km)']*1000)**2)
-
     assoc_gmma = \
         pd.DataFrame(assoc_gmma,
                      columns=["pick_index", "event_index", "gamma_score"]) \
         .set_index('pick_index')
 
-    arrivals = arrivals.join(assoc_gmma)
-    arrivals = arrivals.fillna(-1)
+    assoc_gmma = sample.x.join(assoc_gmma)
+    assoc_gmma = assoc_gmma.fillna(-1)
 
-    labels = arrivals['event'].to_numpy()
-    labels_pred = arrivals['event_index'].to_numpy()
+    labels = sample.y.to_numpy()
+    labels_pred = assoc_gmma['event_index'].to_numpy()
 
     statistics.add(labels,
                    labels_pred,
-                   len(arrivals['event'].unique()),
-                   len(arrivals['event_index'].unique()))
+                   len(sample.y.unique()),
+                   len(assoc_gmma['event_index'].unique()))
+
 
 print(f"GaMMA ARI: {statistics.ari()}, Accuray: {statistics.accuracy()}, "
       f"Precision: {statistics.precision()}, Recall: {statistics.recall()}")
 print(f"GaMMA discovered {statistics.perc_eq()}% of the events correctly.")
 
 # %%
-plot_arrivals(arrivals[['dx', 'dt']],
-              catalog[['dx', 'dt']],
-              cat_gmma[['dx', 'dt']],
+# Plot Results
+cat_gmma['time'] = pd.to_datetime(
+    cat_gmma['time'], unit='ns').values.astype(int)
+cat_gmma['dx'] = PhasePicksDataset.get_distance(
+    cat_gmma, ['x(km)', 'y(km)', 'z(km)'])*1000
+
+catalog_real = sample.catalog.copy()
+catalog_real['dx'] = PhasePicksDataset.get_distance(
+    catalog_real)
+
+associations = assoc_gmma.join(ds.stations.set_index('id'), on='id')
+associations['dx'] = PhasePicksDataset.get_distance(
+    associations, ['x(km)', 'y(km)', 'z(km)'])*1000
+
+associations.rename(columns={'timestamp': 'time'}, inplace=True)
+associations['time'] = pd.to_datetime(
+    associations['time'], unit='ns').values.astype(int)
+
+plot_arrivals(associations[['dx', 'time']],
+              catalog_real[['dx', 'time']],
+              cat_gmma[['dx', 'time']],
               labels, labels_pred)
 
 # %%
