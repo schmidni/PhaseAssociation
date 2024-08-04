@@ -210,6 +210,9 @@ class PhaseAssociationGraphDataset(InMemoryDataset):
         data_list = []
         for raw_path in self.raw_paths:
             data = pd.read_csv(raw_path, parse_dates=['time'])
+            data = data.join(self.stations.set_index('id'), on='station')
+            data = data.drop(
+                columns=['longitude', 'latitude', 'altitude'])
             data_list.append(data)
 
         if self.pre_filter is not None:

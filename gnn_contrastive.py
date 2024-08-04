@@ -11,7 +11,7 @@ from torch import nn
 from torch_geometric.loader import DataLoader
 from torch_geometric.nn import GCNConv
 
-from src.gnn.datasets import PhaseAssociationGraphDataset
+from src.gnn.dataset import PhaseAssociationGraphDataset
 
 # %%
 # Load data
@@ -70,8 +70,8 @@ class GNN(torch.nn.Module):
 
 
 # %%
-# model = GNN(dataset.num_features, 32, 2).to(device)
-model = NN(dataset.num_features, 32, 16).to(device)
+model = GNN(dataset.num_features, 32, 2).to(device)
+# model = NN(dataset.num_features, 32, 16).to(device)
 optimizer = torch.optim.Adam(model.parameters(), lr=1e-2)
 # loss_func = losses.NTXentLoss(embedding_regularizer=LpRegularizer())
 loss_func = losses.SupConLoss(embedding_regularizer=LpRegularizer())
@@ -87,7 +87,7 @@ def train(loader):
     for i, data in enumerate(loader):
         data.to(device)
         optimizer.zero_grad()
-        embeddings = model(data.x)
+        embeddings = model(data)
         loss = loss_func(embeddings, data.y, pairs[i])
         loss.backward()
         optimizer.step()
@@ -105,7 +105,7 @@ def test(loader):
     ari = 0
     for data in loader:
         data.to(device)
-        embeddings = model(data.x)
+        embeddings = model(data)
 
         # Cluster embeddings
         kmeans = KMeans(n_clusters=15, random_state=0).fit(
@@ -139,7 +139,7 @@ print(f"ARI: {ari / len(train_loader.dataset)}")
 
 for i, data in enumerate(test_loader):
     data.to(device)
-    embeddings = model(data.x).cpu().detach()
+    embeddings = model(data).cpu().detach()
 
     plt.scatter(embeddings[:, 0], embeddings[:, 1], c=data.y.cpu())
 

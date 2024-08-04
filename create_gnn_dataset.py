@@ -1,7 +1,7 @@
 import functools
 
-from src.gnn.datasets import (PhaseAssociationGraphDataset,
-                              transform_knn_stations)
+from src.gnn.dataset import (PhaseAssociationGraphDataset,
+                             transform_knn_stations)
 
 transform = functools.partial(
     transform_knn_stations, label='event', include_s=True)

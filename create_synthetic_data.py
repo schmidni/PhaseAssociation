@@ -33,25 +33,21 @@ def create_synthetic_data(out_dir: Path,
     for i in tqdm.tqdm(range(n_catalogs)):
         n = n_events
         if not n_events_fixed:
-            # random integer number
-            n = np.random.randint(min_events, n_events)
+            n = np.random.randint(min_events, n_events)  # random int
         catalog = create_synthetic_catalog(n, duration, *center)
-        associations = create_associations(catalog, stations, v_p, v_s, 60)
-        arrivals = associations.join(stations.set_index('id'), on='station')
-        arrivals = arrivals.drop(columns=['longitude', 'latitude', 'altitude'])
+        arrivals = create_associations(catalog, stations, v_p, v_s, 60)
         arrivals.to_csv(f'{out_dir}/arrivals_{i}.csv', index=False)
         catalog.to_csv(f'{out_dir}/catalog_{i}.csv', index=True)
 
 
 if __name__ == '__main__':
-
     stations = inventory_to_stations('stations/station_cords_blab_VALTER.csv')
     out_dir = Path('data/raw')
     min_events = 15
     n_events = 15
     n_events_fixed = True
     duration = 15
-    n_catalogs = 2000
+    n_catalogs = 10
 
     create_synthetic_data(out_dir,
                           n_catalogs,
