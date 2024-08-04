@@ -1,6 +1,5 @@
 import multiprocessing
 import os
-from typing import Literal
 
 import numpy as np
 import pandas as pd
@@ -114,9 +113,7 @@ def find_matching_indices(A, S):
 
 def transform_knn_stations(arrivals: pd.DataFrame,
                            stations: pd.DataFrame,
-                           nearest_stations: np.ndarray,
-                           label: Literal['event', 'n_clusters'] = 'event',
-                           include_s: bool = True):
+                           nearest_stations: np.ndarray):
     """
     Uses Arrivals as nodes, and builds the graph by connecting each arrival
     not only to other arrivals of the same station, but also the arrivals
@@ -131,12 +128,10 @@ def transform_knn_stations(arrivals: pd.DataFrame,
         lambda x: stations[stations['id'] == x].index[0])
 
     features = []
-    if not include_s:
-        arrivals = arrivals[arrivals['phase'] == 'P']
-    else:
-        phase = torch.tensor(arrivals['phase'].replace(
-            {'P': '0', 'S': '1'}).astype('int32').values, dtype=torch.int32)
-        features.append(phase)
+    phase = torch.tensor(arrivals['phase'].replace(
+        {'P': '0', 'S': '1'}).astype('int32').values, dtype=torch.int32)
+    features.append(phase)
+
     time_ = torch.tensor(arrivals['time'].values, dtype=torch.long)
     features.append(min_max_normalize(time_))
     e = torch.tensor(arrivals['e'].values, dtype=torch.float)
@@ -160,15 +155,9 @@ def transform_knn_stations(arrivals: pd.DataFrame,
                 nearest_stations),
             dtype=torch.long)
 
-    if label == 'event':
-        # graph label: event id
-        data.y = torch.tensor(arrivals['event'], dtype=torch.long)
-    elif label == 'n_clusters':
-        # graph label: number of unique events
-        data.y = torch.tensor(
-            [[arrivals['event'].nunique()]], dtype=torch.long)
+    data.y = torch.tensor(arrivals['event'], dtype=torch.long)
 
-    # data.validate(raise_on_error=True)
+    data.validate(raise_on_error=True)
     return data
 
 

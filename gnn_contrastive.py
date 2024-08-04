@@ -11,12 +11,16 @@ from torch import nn
 from torch_geometric.loader import DataLoader
 from torch_geometric.nn import GCNConv
 
-from src.gnn.dataset import PhaseAssociationGraphDataset
+from src.gnn.dataset import (PhaseAssociationGraphDataset,
+                             transform_knn_stations)
 
 # %%
 # Load data
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-dataset = PhaseAssociationGraphDataset('data', force_reload=False)
+
+dataset = PhaseAssociationGraphDataset(
+    'data', pre_transform=transform_knn_stations, force_reload=False)
+
 n = len(dataset)
 
 # %%
