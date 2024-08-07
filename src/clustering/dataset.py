@@ -4,6 +4,7 @@ from collections import namedtuple
 
 import numpy as np
 import pandas as pd
+import torch
 from torch.utils.data import Dataset
 
 Picks = namedtuple('Picks', ['x', 'y', 'catalog'])
@@ -17,12 +18,14 @@ class PhasePicksDataset(Dataset):
                  catalog_mask=None,
                  transform=None,
                  target_transform=None,
-                 station_transform=None):
+                 station_transform=None,
+                 catalog_transform=None):
 
         self.root_dir = root_dir
         self.transform = transform
         self.target_transform = target_transform
         self.station_transform = station_transform
+        self.catalog_transform = catalog_transform
         self.catalog_files = None
 
         self._stations = pd.read_csv(
@@ -69,6 +72,9 @@ class PhasePicksDataset(Dataset):
         if self.target_transform:
             events = self.target_transform(events)
 
+        if self.catalog_transform:
+            catalog = self.catalog_transform(catalog)
+
         return Picks(x=sample, y=events, catalog=catalog)
 
     @staticmethod
@@ -110,3 +116,25 @@ class GaMMAStationFormat:
             columns={'e': 'x(km)', 'n': 'y(km)', 'u': 'z(km)'})
         stn = stn[['id', 'x(km)', 'y(km)', 'z(km)']]
         return stn
+
+
+class NDArrayTransformX:
+    def __init__(self,
+                 drop_cols=['station'],
+                 cat_cols=['phase']):
+        self.drop_cols = drop_cols
+        self.cat_cols = cat_cols
+
+    def __call__(self, sample):
+        sample = sample.drop(columns=self.drop_cols)
+        for col in self.cat_cols:
+            sample[col] = sample[col].astype('category').cat.codes
+        return torch.tensor(sample.to_numpy(), dtype=torch.float64)
+
+
+class NDArrayTransform:
+    def __init__(self):
+        pass
+
+    def __call__(self, sample):
+        return torch.tensor(sample.to_numpy(), dtype=torch.float64)
