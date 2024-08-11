@@ -120,21 +120,27 @@ class GaMMAStationFormat:
 
 class NDArrayTransformX:
     def __init__(self,
+                 device=None,
                  drop_cols=['station'],
                  cat_cols=['phase']):
         self.drop_cols = drop_cols
         self.cat_cols = cat_cols
+        self.device = device
 
     def __call__(self, sample):
         sample = sample.drop(columns=self.drop_cols)
         for col in self.cat_cols:
             sample[col] = sample[col].astype('category').cat.codes
-        return torch.tensor(sample.to_numpy(), dtype=torch.float64)
+        return torch.tensor(sample.to_numpy(),
+                            dtype=torch.float64,
+                            device=self.device)
 
 
 class NDArrayTransform:
-    def __init__(self):
-        pass
+    def __init__(self, device=None):
+        self.device = device
 
     def __call__(self, sample):
-        return torch.tensor(sample.to_numpy(), dtype=torch.float64)
+        return torch.tensor(sample.to_numpy(),
+                            dtype=torch.float64,
+                            device=self.device)

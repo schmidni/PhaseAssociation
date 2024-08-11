@@ -1,12 +1,17 @@
 # %%
+from time import time
+
 import matplotlib.pyplot as plt
+import numpy as np
 import torch
+import tqdm
 from pytorch_metric_learning import losses
 from pytorch_metric_learning.regularizers import LpRegularizer
 from pytorch_metric_learning.utils import loss_and_miner_utils as lmu
+from sklearn import mixture
 from sklearn.cluster import KMeans
 from sklearn.metrics import adjusted_rand_score
-from sklearn.preprocessing import MinMaxScaler, StandardScaler  # noqa
+from sklearn.preprocessing import StandardScaler
 from torch import nn
 from torch.utils.data import random_split
 from torch_geometric.loader import DataLoader
@@ -21,9 +26,10 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 
 def scale_data(sample):
-    scaler = StandardScaler()
-    # scaler = MinMaxScaler((0, 100))
-    return torch.tensor(scaler.fit_transform(sample), dtype=torch.float64)
+    scaler_std = StandardScaler()
+    return torch.tensor(scaler_std.fit_transform(sample),
+                        dtype=torch.float64,
+                        device=device)
 
 
 ds = PhasePicksDataset(
@@ -32,12 +38,13 @@ ds = PhasePicksDataset(
     file_mask='arrivals_*.csv',
     catalog_mask='catalog_*.csv',
     transform=transforms.Compose([
-        NDArrayTransformX(drop_cols=['station', 'phase'],
-                          cat_cols=[]),
+        NDArrayTransformX(drop_cols=['station'],
+                          cat_cols=['phase']),
         scale_data]),
     target_transform=NDArrayTransform(),
     catalog_transform=NDArrayTransform(),
 )
+
 n_feats = ds[0].x.shape[1]
 
 # %%
@@ -50,8 +57,8 @@ train_loader = DataLoader(train_dataset, batch_size=1)
 pairs = []
 for i, ds in enumerate(train_loader):
     a1, p, a2, n = lmu.get_all_pairs_indices(ds.y.squeeze())
-    pos = torch.randperm(len(a1))[:1000]
-    neg = torch.randperm(len(a2))[:10000]
+    pos = torch.randperm(len(a1))[:2500]
+    neg = torch.randperm(len(a2))[:25000]
 
     select = a1[pos], p[pos], a2[neg], n[neg]
 
@@ -90,19 +97,21 @@ def train(loader):
     model.train()
     train_loss = 0
 
-    for i, data in enumerate(loader.dataset):
+    for i, data in enumerate(loader):
+
         data.x.to(device)
         optimizer.zero_grad()
         embeddings = model(data.x)
+
         loss = loss_func(embeddings.squeeze(), data.y.squeeze(), pairs[i])
         loss.backward()
         optimizer.step()
 
         train_loss += loss.item()
         if i % 100 == 0:
-            print(f"Batch {i}, Loss: {loss.item()}")
+            print(f"Batch {i}, Loss: {np.round(loss.item(), 3)}")
 
-    return train_loss / len(loader.dataset)
+    return train_loss / len(loader)
 
 
 @torch.no_grad()
@@ -112,35 +121,41 @@ def test(loader):
     for data in loader:
         data.x.to(device)
         embeddings = model(data.x)
-        n_clusters = len(data.y.squeeze().unique())
+
         # Cluster embeddings
+        n_clusters = len(data.y.squeeze().unique())
         kmeans = KMeans(n_clusters=n_clusters, random_state=0).fit(
             embeddings.cpu().squeeze().numpy())
         labels = kmeans.labels_
 
         ari += adjusted_rand_score(data.y.squeeze().cpu(), labels)
 
-    return ari / len(loader.dataset)
+    return ari / len(loader)
 
-
-for epoch in range(3):
-    train_loss = train(train_loader)
-    test_ari = test(test_loader)
-    print(f"Epoch {epoch}, Train Loss: {train_loss}, Test ARI: {test_ari}")
 
 # %%
-# without Contrastive Step
+start = time()
+for epoch in range(10):
+    train_loss = train(train_loader)
+    test_ari = test(test_loader)
+    end = time() - start
+    print(f"Epoch {epoch+1}, "
+          f"Train Loss: {np.round(train_loss, 3)}, "
+          f"Test ARI: {np.round(test_ari, 3)}, "
+          f"Time: {np.round(end/60, 2)} min")
+
+# %%
+# Cluster without Contrastive Step
 ari = 0
 for data in train_loader:
     n_clusters = len(data.y.squeeze().unique())
-    # Cluster embeddings
     kmeans = KMeans(n_clusters=n_clusters, random_state=0).fit(
-        data.x.squeeze().numpy())
+        data.x.cpu().squeeze().numpy())
     labels = kmeans.labels_
 
     ari += adjusted_rand_score(data.y.squeeze().cpu(), labels)
 
-print(f"ARI: {ari / len(train_loader.dataset)}")
+print(f"ARI: {np.round(ari / len(train_loader),3)}")
 
 # %%
 
@@ -154,3 +169,5 @@ for i, data in enumerate(test_loader):
     if i == 2:
         break
 # %%
+
+torch.save(model.state_dict(), 'model')
