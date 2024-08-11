@@ -97,15 +97,14 @@ def create_associations(catalog: pd.DataFrame,
         events_noise = np.full(n_noise, -1)
 
         times_noise = \
-            (np.random.uniform(0, duration, n_noise)
-             * 1e6).astype('timedelta64[ns]') + \
-            pd.to_datetime(startdate)
+            pd.to_timedelta(np.random.uniform(0, duration, n_noise), 's') \
+            + pd.to_datetime(startdate)
 
         phases_noise = np.random.choice(['P', 'S'], n_noise)
         amplitudes_noise = at_s_np['amplitude'] \
             .sample(n_noise, replace=True).to_numpy()
         amplitudes_noise += np.clip(
-            np.random.normal(0, percent_noise*5, n_noise), -1, 1) \
+            np.random.normal(0, percent_noise*5, n_noise), -0.4, 1) \
             * amplitudes_noise
 
         noise_np = np.array(

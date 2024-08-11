@@ -76,6 +76,9 @@ def plot_arrivals(arrivals, cat, cat_pred, labels, labels_pred):
                       )
     ax[0].scatter(cat['time'] / 1000, cat['dx'],
                   color='darkorange', marker='x')
+    ax[0].scatter(arrivals.loc[labels == -1, 'time'] / 1000,
+                  arrivals.loc[labels == -1, 'dx'],
+                  color='black', s=20)
 
 
 def plot_clusters(X, Y_, means, covariances, x, y, index, title):
