@@ -4,11 +4,9 @@ from time import time
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
-import tqdm
 from pytorch_metric_learning import losses
 from pytorch_metric_learning.regularizers import LpRegularizer
 from pytorch_metric_learning.utils import loss_and_miner_utils as lmu
-from sklearn import mixture
 from sklearn.cluster import KMeans
 from sklearn.metrics import adjusted_rand_score
 from sklearn.preprocessing import StandardScaler
@@ -32,6 +30,12 @@ def scale_data(sample):
                         device=device)
 
 
+def noise(target):
+    # transformation if only noise/true pick should be differentiated
+    target = torch.where(target == -1, 0, 1)
+    return target
+
+
 ds = PhasePicksDataset(
     root_dir='data/raw',
     stations_file='stations.csv',
@@ -41,7 +45,9 @@ ds = PhasePicksDataset(
         NDArrayTransformX(drop_cols=['station'],
                           cat_cols=['phase']),
         scale_data]),
-    target_transform=NDArrayTransform(),
+    target_transform=transforms.Compose([NDArrayTransform(),
+                                        #  noise
+                                         ]),
     catalog_transform=NDArrayTransform(),
 )
 
@@ -135,7 +141,7 @@ def test(loader):
 
 # %%
 start = time()
-for epoch in range(10):
+for epoch in range(2):
     train_loss = train(train_loader)
     test_ari = test(test_loader)
     end = time() - start
@@ -163,11 +169,11 @@ for i, data in enumerate(test_loader):
     data.x.to(device)
     embeddings = model(data.x).cpu().detach().squeeze()
 
-    plt.scatter(embeddings.squeeze()[:, 3], embeddings.squeeze()[
+    plt.scatter(embeddings.squeeze()[:, 1], embeddings.squeeze()[
                 :, 4], c=data.y.squeeze().cpu())
 
     if i == 2:
         break
 # %%
 
-torch.save(model.state_dict(), 'model')
+torch.save(model.state_dict(), 'model2')
