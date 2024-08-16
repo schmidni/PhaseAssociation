@@ -1,4 +1,4 @@
-#
+# %%
 import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
@@ -11,11 +11,11 @@ from src.synthetics.seismicity_samples_Dieterich94 import (
 
 # matplotlib.use('TkAgg')
 matplotlib.use('Qt5Agg')
-ticksize = 18
-labelsize = 20
-markersize = 120
+ticksize = 24
+labelsize = 26
+markersize = 200
 
-
+# %%
 # FMD Plot
 catalog_fmd = pd.read_csv('plots/data/fmd/catalog_0.csv')
 
@@ -76,10 +76,6 @@ plt.show()
 stations = pd.read_csv('stations/station_cords_blab_VALTER.csv')
 
 stations.rename(columns={'station_code': 'id'}, inplace=True)
-stations.drop(columns=['network_code', 'location_code',
-              'chanel_code'], inplace=True)
-
-stations_coords = stations[['id', 'longitude', 'latitude', 'elevation']]
 stations_enu = stations[['id', 'x', 'y', 'z']]
 
 # Specify reference focal mechanism
@@ -136,3 +132,40 @@ ax.tick_params(axis='z', labelsize=ticksize)
 plt.show()
 
 #
+# %%
+stations = pd.read_csv('stations/station_cords_blab_VALTER.csv')
+stations.rename(columns={'station_code': 'id'}, inplace=True)
+stations = stations[['id', 'x', 'y', 'z']]
+
+arrivals = pd.read_csv(
+    'plots/data/arrivals/arrivals_0.csv', parse_dates=['time'])
+arrivals['time'] = arrivals['time'] - arrivals['time'].min()
+arrivals['time'] = arrivals['time'].dt.microseconds
+
+arrivals = arrivals.join(stations.set_index('id'), on='station')
+
+print(arrivals)
+fig, ax = plt.subplots(figsize=(16, 12))
+plt.xlabel('time [μs]', fontsize=labelsize)
+plt.ylabel('Station y-coordinate [m]', fontsize=labelsize)
+plt.xticks(fontsize=ticksize)
+plt.yticks(fontsize=ticksize)
+
+
+def format_func(x, pos):
+    return np.round(x, 2)
+
+
+# Apply the formatter to the x-axis
+plt.gca().xaxis.set_major_formatter(FuncFormatter(format_func))
+
+colors = ['blue', 'green', 'red', 'purple', 'orange',
+          'brown', 'pink', 'gray', 'olive', 'black']
+for group, df in arrivals.groupby('event'):
+    ax.scatter(df['time'], df['y'], marker='o',
+               color=colors[group], s=markersize)
+
+fig.show()
+
+
+# %%
