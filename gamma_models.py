@@ -48,7 +48,6 @@ for sample in tqdm.tqdm(ds):
     cat_gmma, assoc_gmma = association(
         sample.x, ds.stations, config, method=config["method"])
 
-    cat_gmma = pd.DataFrame(cat_gmma)
     assoc_gmma = \
         pd.DataFrame(assoc_gmma,
                      columns=["pick_index", "event_index", "gamma_score"]) \
@@ -64,7 +63,7 @@ for sample in tqdm.tqdm(ds):
                    labels_pred,
                    len(sample.y.unique()),
                    len(assoc_gmma['event_index'].unique()))
-
+    break
 
 print(f"GaMMA ARI: {statistics.ari()}, Accuray: {statistics.accuracy()}, "
       f"Precision: {statistics.precision()}, Recall: {statistics.recall()}")
@@ -72,6 +71,7 @@ print(f"GaMMA discovered {statistics.perc_eq()}% of the events correctly.")
 
 # %%
 # Plot Results
+cat_gmma = pd.DataFrame(cat_gmma)
 cat_gmma['time'] = pd.to_datetime(
     cat_gmma['time'], unit='ns').values.astype(int)
 cat_gmma['dx'] = PhasePicksDataset.get_distance(
@@ -89,9 +89,8 @@ associations.rename(columns={'timestamp': 'time'}, inplace=True)
 associations['time'] = pd.to_datetime(
     associations['time'], unit='ns').values.astype(int)
 
+
 plot_arrivals(associations[['dx', 'time']],
               catalog_real[['dx', 'time']],
               cat_gmma[['dx', 'time']],
               labels, labels_pred)
-
-# %%
