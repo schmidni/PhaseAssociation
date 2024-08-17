@@ -1,4 +1,4 @@
-# %%
+# %% Imports and Configuration
 import numpy as np
 import pandas as pd
 import pyocto
@@ -6,6 +6,7 @@ import tqdm
 
 from src.clustering.dataset import (GaMMAPickFormat, GaMMAStationFormat,
                                     PhasePicksDataset)
+from src.clustering.models import run_pyocto
 from src.clustering.utils import ClusterStatistics, plot_arrivals
 
 velocity_model = pyocto.VelocityModel0D(
@@ -50,7 +51,7 @@ associator = pyocto.OctoAssociator.from_area(
     min_pick_fraction=0.25
 )
 
-# %%
+# %% Run PyOcto
 statistics = ClusterStatistics()
 
 ds = PhasePicksDataset(
@@ -63,41 +64,27 @@ ds = PhasePicksDataset(
 )
 
 for sample in tqdm.tqdm(ds):
-    events, assignments = associator.associate_gamma(sample.x, ds.stations)
+    events, labels_pred = run_pyocto(sample.x, ds.stations, associator)
 
-    labels = sample.y.to_numpy()
-    labels_pred = np.full(len(labels), -1)
-    labels_pred[assignments['pick_idx']] = assignments['event_idx']
-
-    statistics.add(labels,
+    statistics.add(sample.y.to_numpy(),
                    labels_pred,
-                   len(sample.y.unique()),
-                   len(assignments['event_idx'].unique()))
-
+                   len(sample.y.unique())-1,
+                   len(np.unique(labels_pred))-1)
 
 print(f"PyOcto ARI: {statistics.ari()}, Accuray: {statistics.accuracy()}, "
       f"Precision: {statistics.precision()}, Recall: {statistics.recall()}")
 print(f"PyOcto discovered {statistics.perc_eq()}% of the events correctly.")
 
-# %%
-# Plot Results
+# %% Plot Results
 associations = sample.x.copy().join(ds.stations.set_index('id'), on='id')
 associations['dx'] = PhasePicksDataset.get_distance(
     associations, ['x(km)', 'y(km)', 'z(km)'])*1000
 associations['time'] = pd.to_datetime(
     associations['timestamp'], unit='ns').values.astype(int)
 
-catalog_real = sample.catalog.copy()
-catalog_real['dx'] = PhasePicksDataset.get_distance(
-    catalog_real)
-
-events_pyocto = events.copy()
-events_pyocto['z'] = 0.1
-events_pyocto['dx'] = PhasePicksDataset.get_distance(
-    events_pyocto, ['x', 'y', 'z'])*1000
-events_pyocto['time'] = events_pyocto['time'].astype(int)*1e9
-
 plot_arrivals(associations[['dx', 'time']],
-              catalog_real[['dx', 'time']],
-              events_pyocto[['dx', 'time']],
-              labels, labels_pred)
+              events[['dx', 'time']],
+              events[['dx', 'time']],
+              sample.y.to_numpy(), labels_pred)
+
+# %%

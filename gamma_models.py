@@ -1,11 +1,12 @@
-# %%
+# %% Imports and Configuration
+import numpy as np
 import pandas as pd
 import tqdm
 
 from src.clustering.dataset import (GaMMAPickFormat, GaMMAStationFormat,
                                     PhasePicksDataset)
+from src.clustering.models import run_gamma
 from src.clustering.utils import ClusterStatistics, plot_arrivals
-from src.gamma.utils import association
 
 config = {
     "ncpu": 4,
@@ -32,7 +33,7 @@ config = {
     "max_sigma12": 2.0
 }
 
-# %%
+# %% Run GaMMA
 statistics = ClusterStatistics()
 
 ds = PhasePicksDataset(
@@ -45,52 +46,28 @@ ds = PhasePicksDataset(
 )
 
 for sample in tqdm.tqdm(ds):
-    cat_gmma, assoc_gmma = association(
-        sample.x, ds.stations, config, method=config["method"])
+    cat_gmma, labels_pred = run_gamma(sample.x, ds.stations, config)
 
-    assoc_gmma = \
-        pd.DataFrame(assoc_gmma,
-                     columns=["pick_index", "event_index", "gamma_score"]) \
-        .set_index('pick_index')
-
-    assoc_gmma = sample.x.join(assoc_gmma)
-    assoc_gmma = assoc_gmma.fillna(-1)
-
-    labels = sample.y.to_numpy()
-    labels_pred = assoc_gmma['event_index'].to_numpy()
-
-    statistics.add(labels,
+    statistics.add(sample.y.to_numpy(),
                    labels_pred,
-                   len(sample.y.unique()),
-                   len(assoc_gmma['event_index'].unique()))
-    break
+                   len(sample.y.unique())-1,
+                   len(np.unique(labels_pred)-1))
+
 
 print(f"GaMMA ARI: {statistics.ari()}, Accuray: {statistics.accuracy()}, "
       f"Precision: {statistics.precision()}, Recall: {statistics.recall()}")
 print(f"GaMMA discovered {statistics.perc_eq()}% of the events correctly.")
 
-# %%
-# Plot Results
-cat_gmma = pd.DataFrame(cat_gmma)
-cat_gmma['time'] = pd.to_datetime(
-    cat_gmma['time'], unit='ns').values.astype(int)
-cat_gmma['dx'] = PhasePicksDataset.get_distance(
-    cat_gmma, ['x(km)', 'y(km)', 'z(km)'])*1000
-
-catalog_real = sample.catalog.copy()
-catalog_real['dx'] = PhasePicksDataset.get_distance(
-    catalog_real)
-
-associations = assoc_gmma.join(ds.stations.set_index('id'), on='id')
+# %% Plot Results
+associations = sample.x.copy().join(ds.stations.set_index('id'), on='id')
 associations['dx'] = PhasePicksDataset.get_distance(
     associations, ['x(km)', 'y(km)', 'z(km)'])*1000
-
-associations.rename(columns={'timestamp': 'time'}, inplace=True)
 associations['time'] = pd.to_datetime(
-    associations['time'], unit='ns').values.astype(int)
-
+    associations['timestamp'], unit='ns').values.astype(int)
 
 plot_arrivals(associations[['dx', 'time']],
-              catalog_real[['dx', 'time']],
+              sample.catalog[['dx', 'time']],
               cat_gmma[['dx', 'time']],
-              labels, labels_pred)
+              sample.y.to_numpy(), labels_pred)
+
+# %%

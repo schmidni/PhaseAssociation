@@ -63,6 +63,7 @@ class PhasePicksDataset(Dataset):
         if self.catalog_files:
             catalog = pd.read_csv(self.catalog_files[idx], index_col=0)
             catalog = self.convert_datetime(catalog)
+            catalog['dx'] = self.get_distance(catalog)
         else:
             catalog = None
 
@@ -95,9 +96,9 @@ class GaMMAPickFormat:
 
     def __call__(self, sample):
         sample = sample.rename(columns={'station': 'id',
-                                        'time': 'timestamp',
                                         'phase': 'type',
-                                        'amplitude': 'amp'})
+                                        'amplitude': 'amp',
+                                        'time': 'timestamp'})
         sample = sample[['id', 'timestamp', 'type', 'amp']]
         sample['timestamp'] = pd.to_datetime(sample['timestamp'], unit='ns')
         sample['prob'] = 1
