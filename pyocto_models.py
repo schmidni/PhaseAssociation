@@ -10,40 +10,39 @@ from src.clustering.models import run_pyocto
 from src.clustering.utils import ClusterStatistics, plot_arrivals
 
 velocity_model = pyocto.VelocityModel0D(
-    p_velocity=5.5,  # 5.5,
-    s_velocity=2.7,  # 2.7,
+    p_velocity=5.5,
+    s_velocity=2.7,
     tolerance=0.1,
 )
 
-associator = pyocto.OctoAssociator.from_area(
-    lat=(46.4, 46.6),
-    lon=(8.4, 8.6),
-    zlim=(-1, -2),
-    # lat=(46,47),
-    # lon=(8,9),
-    # zlim=(-1,-3),
+associator = pyocto.OctoAssociator(
+    xlim=(0, -0.25),
+    ylim=(0, -0.15),
+    zlim=(0, 0.25),
 
-    time_before=0.1,  # 300,
+    time_before=1,  # 300,
 
     velocity_model=velocity_model,
 
-    # n_picks=4,
-    # n_p_and_s_picks=4,
+    n_picks=8,
+    n_p_and_s_picks=4,
     n_p_picks=4,
     n_s_picks=4,
 
-    min_node_size=5e-1,  # 10.0,
-    min_node_size_location=0.75e-1,  # 1.5,
+    min_node_size=1e-1,  # 10.0, min node size for association
+    min_node_size_location=1,  # 1.5, min node size for location
 
-    pick_match_tolerance=1.5,  # 1.5,
+    pick_match_tolerance=0.1,  # 1.5, max diff predicted/observed time
 
-    min_interevent_time=0.0001,  # 3.0,
-    exponential_edt=False,
+    min_interevent_time=1e-10,  # 3.0, min time between events
+
+    exponential_edt=False,  # leading to better locations
     edt_pick_std=1.0,  # 1.0,
-    max_pick_overlap=4,  # 4,
+
+    max_pick_overlap=4,  # 4, max number of picks shared between events
 
     refinement_iterations=3,  # 3,
-    time_slicing=0.5,  # 1200.0,
+    time_slicing=5,  # 1200.0,
     node_log_interval=0,  # 0,
 
     location_split_depth=6,  # 6,
