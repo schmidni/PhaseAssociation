@@ -17,8 +17,8 @@ def create_synthetic_data(out_dir: Path,
                           max_events: int,
                           duration: int,
                           stations: pd.DataFrame,
-                          add_noise: bool = False,
-                          percent_noise: float = 0.1):
+                          add_noise: bool = True,
+                          noise_factor: float = 1):
 
     center = np.array(
         [stations['e'].mean(), stations['n'].mean(), stations['u'].mean()])
@@ -41,7 +41,7 @@ def create_synthetic_data(out_dir: Path,
         arrivals = create_associations(catalog, stations, v_p, v_s, 60,
                                        duration, startdate=startdate,
                                        add_noise=add_noise,
-                                       percent_noise=percent_noise)
+                                       noise_factor=noise_factor)
         arrivals.to_csv(f'{out_dir}/arrivals_{i}.csv', index=False)
         catalog.to_csv(f'{out_dir}/catalog_{i}.csv', index=True)
 
@@ -50,11 +50,11 @@ if __name__ == '__main__':
     stations = inventory_to_stations('stations/station_cords_blab_VALTER.csv')
     out_dir = Path('data/raw')
     min_events = 5
-    max_events = 40
-    duration = 10
-    n_catalogs = 10
+    max_events = 5
+    duration = 5
+    n_catalogs = 1
     add_noise = True
-    percent_noise = 0.4
+    noise_factor = 1
 
     create_synthetic_data(out_dir,
                           n_catalogs,
@@ -63,4 +63,4 @@ if __name__ == '__main__':
                           duration,
                           stations,
                           add_noise=add_noise,
-                          percent_noise=percent_noise)
+                          noise_factor=noise_factor)

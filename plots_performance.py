@@ -87,19 +87,19 @@ data_config = {
         "min_events": 3,
         "max_events": 6,
         "add_noise": True,
-        "percent_noise": 0.1
+        "noise_factor": 1
     },
     "medium": {
         "min_events": 20,
         "max_events": 30,
         "add_noise": True,
-        "percent_noise": 0.2
+        "noise_factor": 3
     },
     "hard": {
         "min_events": 40,
         "max_events": 60,
         "add_noise": True,
-        "percent_noise": 0.3
+        "noise_factor": 6
     }
 }
 
@@ -108,10 +108,10 @@ stat_gamma = {}
 stat_pyocto = {}
 
 duration = 10
-n_catalogs = 100
+n_catalogs = 5
 
 for key, value in data_config.items():
-    if False:
+    if True:
         create_synthetic_data(out_dir / Path(key),
                               n_catalogs,
                               value['min_events'],
@@ -119,7 +119,7 @@ for key, value in data_config.items():
                               duration,
                               stations,
                               add_noise=value['add_noise'],
-                              percent_noise=value['percent_noise'])
+                              noise_factor=value['noise_factor'])
 
     datasets[key] = PhasePicksDataset(
         root_dir=out_dir / Path(key),

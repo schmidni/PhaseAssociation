@@ -16,7 +16,7 @@ labelsize = 26
 markersize = 200
 
 # %%
-# FMD Plot
+# FMD Plot ###################################################################
 catalog_fmd = pd.read_csv('plots/data/fmd/catalog_0.csv')
 
 
@@ -39,7 +39,7 @@ plt.xticks(fontsize=ticksize)
 plt.yticks(fontsize=ticksize)
 plt.show()
 
-# Rate Plot
+# Rate Plot ##################################################################
 catalog_rate = pd.read_csv(
     'plots/data/rate/catalog_0.csv', parse_dates=['time'], index_col=0)
 catalog_rate = catalog_rate.set_index('time', drop=True)
@@ -71,7 +71,7 @@ plt.yticks(fontsize=ticksize)
 plt.show()
 
 
-# Plot 3D hypocentre distribution & finite slip patch
+# Plot 3D hypocentre distribution & finite slip patch ########################
 
 stations = pd.read_csv('stations/station_cords_blab_VALTER.csv')
 
@@ -132,7 +132,7 @@ ax.tick_params(axis='z', labelsize=ticksize)
 plt.show()
 
 #
-# %%
+# %% Plot arrivals ###########################################################
 stations = pd.read_csv('stations/station_cords_blab_VALTER.csv')
 stations.rename(columns={'station_code': 'id'}, inplace=True)
 stations = stations[['id', 'x', 'y', 'z']]
@@ -144,7 +144,6 @@ arrivals['time'] = arrivals['time'].dt.microseconds
 
 arrivals = arrivals.join(stations.set_index('id'), on='station')
 
-print(arrivals)
 fig, ax = plt.subplots(figsize=(16, 12))
 plt.xlabel('time [μs]', fontsize=labelsize)
 plt.ylabel('Station y-coordinate [m]', fontsize=labelsize)
