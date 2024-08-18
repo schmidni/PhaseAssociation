@@ -1,5 +1,4 @@
 # %% Imports and Configuration
-import numpy as np
 import pandas as pd
 import pyocto
 import tqdm
@@ -43,7 +42,7 @@ associator = pyocto.OctoAssociator(
 
     refinement_iterations=3,  # 3,
     time_slicing=5,  # 1200.0,
-    node_log_interval=0,  # 0,
+    node_log_interval=0,  # 0, # logging interval in seconds
 
     location_split_depth=6,  # 6,
     location_split_return=4,  # 4,
@@ -67,12 +66,13 @@ for sample in tqdm.tqdm(ds):
 
     statistics.add(sample.y.to_numpy(),
                    labels_pred,
-                   len(sample.y.unique())-1,
-                   len(np.unique(labels_pred))-1)
+                   sample.catalog,
+                   events)
 
 print(f"PyOcto ARI: {statistics.ari()}, Accuray: {statistics.accuracy()}, "
       f"Precision: {statistics.precision()}, Recall: {statistics.recall()}")
-print(f"PyOcto discovered {statistics.perc_eq()}% of the events correctly.")
+print(f"PyOcto event precision: {statistics.event_precision()}, "
+      f"PyOcto event recall: {statistics.event_recall()}")
 
 # %% Plot Results
 associations = sample.x.copy().join(ds.stations.set_index('id'), on='id')
@@ -82,7 +82,7 @@ associations['time'] = pd.to_datetime(
     associations['timestamp'], unit='ns').values.astype(int)
 
 plot_arrivals(associations[['dx', 'time']],
-              events[['dx', 'time']],
+              sample.catalog[['dx', 'time']],
               events[['dx', 'time']],
               sample.y.to_numpy(), labels_pred)
 

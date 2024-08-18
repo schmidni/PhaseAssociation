@@ -3,6 +3,7 @@ from pathlib import Path
 
 import numpy as np
 import pyocto
+from matplotlib import pyplot as plt
 from tqdm import tqdm
 
 from create_synthetic_data import create_synthetic_data
@@ -12,6 +13,7 @@ from src.clustering.models import run_gamma, run_pyocto
 from src.clustering.utils import ClusterStatistics
 from src.synthetics.create_associations import inventory_to_stations
 
+# %%
 # generate 100 easy, 100 medium, 100 hard samples
 stations = inventory_to_stations('stations/station_cords_blab_VALTER.csv')
 out_dir = Path('data/performance')
@@ -84,22 +86,28 @@ config_gamma = {
 
 data_config = {
     "easy": {
-        "min_events": 3,
-        "max_events": 6,
+        "min_events": 8,
+        "max_events": 12,
         "add_noise": True,
-        "noise_factor": 1
+        "noise_factor": 5
     },
     "medium": {
-        "min_events": 20,
-        "max_events": 30,
+        "min_events": 25,
+        "max_events": 35,
         "add_noise": True,
-        "noise_factor": 3
+        "noise_factor": 5
     },
     "hard": {
         "min_events": 40,
         "max_events": 60,
         "add_noise": True,
-        "noise_factor": 6
+        "noise_factor": 5
+    },
+    "veryhard": {
+        "min_events": 90,
+        "max_events": 110,
+        "add_noise": True,
+        "noise_factor": 5
     }
 }
 
@@ -108,7 +116,7 @@ stat_gamma = {}
 stat_pyocto = {}
 
 duration = 10
-n_catalogs = 5
+n_catalogs = 10
 
 for key, value in data_config.items():
     if True:
@@ -142,24 +150,78 @@ for key, ds in datasets.items():
         cat_gmma, labels_pred = run_gamma(sample.x, ds.stations, config_gamma)
         stat_gamma[key].add(sample.y.to_numpy(),
                             labels_pred,
-                            len(sample.y.unique())-1,
-                            len(np.unique(labels_pred)-1))
+                            sample.catalog,
+                            cat_gmma)
 
         events, labels_pred = run_pyocto(sample.x, ds.stations, config_pyocto)
         stat_pyocto[key].add(sample.y.to_numpy(),
                              labels_pred,
-                             len(sample.y.unique())-1,
-                             len(np.unique(labels_pred)-1))
+                             sample.catalog,
+                             events)
 
     print(f"GaMMA {key} ARI: {stat_gamma[key].ari()}, "
           f"Accuray: {stat_gamma[key].accuracy()}, "
           f"Precision: {stat_gamma[key].precision()}, "
           f"Recall: {stat_gamma[key].recall()}")
-    print(f"GaMMA {key} discovered {stat_gamma[key].perc_eq()}% "
-          "of the events correctly.")
+    print(f"GaMMA event precision {key}: {stat_gamma[key].event_precision()}, "
+          f"GaMMA event recall {key}: {stat_gamma[key].event_recall()}")
+
     print(f"PyOcto {key} ARI: {stat_pyocto[key].ari()}, "
           f"Accuray: {stat_pyocto[key].accuracy()}, "
           f"Precision: {stat_pyocto[key].precision()}, "
           f"Recall: {stat_pyocto[key].recall()}")
-    print(f"PyOcto {key} discovered {stat_pyocto[key].perc_eq()}% "
-          "of the events correctly.")
+    print(f"PyOcto event precision {key}: "
+          f"{stat_pyocto[key].event_precision()}, "
+          f"PyOcto event recall {key}: {stat_pyocto[key].event_recall()}")
+
+# %%
+GaMMA_ari = np.array([stat_gamma[key].ari() for key in data_config.keys()])
+GaMMA_accuracy = np.array([stat_gamma[key].accuracy()
+                          for key in data_config.keys()])
+GaMMA_precision = np.array([stat_gamma[key].precision()
+                           for key in data_config.keys()])
+GaMMA_recall = np.array([stat_gamma[key].recall()
+                        for key in data_config.keys()])
+
+PyOcto_ari = np.array([stat_pyocto[key].ari() for key in data_config.keys()])
+PyOcto_accuracy = np.array([stat_pyocto[key].accuracy()
+                           for key in data_config.keys()])
+PyOcto_precision = np.array([stat_pyocto[key].precision()
+                            for key in data_config.keys()])
+PyOcto_recall = np.array([stat_pyocto[key].recall()
+                         for key in data_config.keys()])
+
+lables = ['1/s', '3/s', '5/s', '10/s']
+
+fig, ax = plt.subplots(2, 2, figsize=(10, 10))
+ax[0, 0].plot(GaMMA_ari, label='GaMMA')
+ax[0, 0].plot(PyOcto_ari, label='PyOcto')
+ax[0, 0].set_title('ARI')
+ax[0, 0].set_xticks(range(len(data_config.keys())))
+ax[0, 0].set_xticklabels(lables)
+ax[0, 0].legend()
+
+ax[0, 1].plot(GaMMA_accuracy, label='GaMMA')
+ax[0, 1].plot(PyOcto_accuracy, label='PyOcto')
+ax[0, 1].set_title('Accuracy')
+ax[0, 1].set_xticks(range(len(data_config.keys())))
+ax[0, 1].set_xticklabels(lables)
+ax[0, 1].legend()
+
+ax[1, 0].plot(GaMMA_precision, label='GaMMA')
+ax[1, 0].plot(PyOcto_precision, label='PyOcto')
+ax[1, 0].set_title('Precision')
+ax[1, 0].set_xticks(range(len(data_config.keys())))
+ax[1, 0].set_xticklabels(lables)
+ax[1, 0].legend()
+
+ax[1, 1].plot(GaMMA_recall, label='GaMMA')
+ax[1, 1].plot(PyOcto_recall, label='PyOcto')
+ax[1, 1].set_title('Recall')
+ax[1, 1].set_xticks(range(len(data_config.keys())))
+ax[1, 1].set_xticklabels(lables)
+ax[1, 1].legend()
+
+plt.show()
+
+# %%

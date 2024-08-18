@@ -1,5 +1,4 @@
 # %% Imports and Configuration
-import numpy as np
 import pandas as pd
 import tqdm
 
@@ -50,13 +49,14 @@ for sample in tqdm.tqdm(ds):
 
     statistics.add(sample.y.to_numpy(),
                    labels_pred,
-                   len(sample.y.unique())-1,
-                   len(np.unique(labels_pred)-1))
-
+                   sample.catalog,
+                   cat_gmma)
+    break
 
 print(f"GaMMA ARI: {statistics.ari()}, Accuray: {statistics.accuracy()}, "
       f"Precision: {statistics.precision()}, Recall: {statistics.recall()}")
-print(f"GaMMA discovered {statistics.perc_eq()}% of the events correctly.")
+print(f"GaMMA event precision: {statistics.event_precision()}, "
+      f"GaMMA event recall: {statistics.event_recall()}")
 
 # %% Plot Results
 associations = sample.x.copy().join(ds.stations.set_index('id'), on='id')

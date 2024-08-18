@@ -12,13 +12,44 @@ class ClusterStatistics:
     def __init__(self):
         self._ari = []
         self._pcm = []
-        self._perc_eq = []
+        self._event_confusion = []
 
-    def add(self, labels, labels_pred, n_true=None, n_pred=None):
+    def add(self, labels, labels_pred, cat_true=None, cat_pred=None):
         self._ari.append(ARI(labels, labels_pred))
         self._pcm.append(PCM(labels, labels_pred))
-        if n_true and n_pred:
-            self._perc_eq.append(abs(n_true-n_pred) / n_true)
+
+        if cat_true is not None and cat_pred is not None:
+            self._event_confusion.append(self.detected(cat_true, cat_pred))
+
+    def detected(self, cat_true, cat_pred):
+        min = np.minimum(cat_true['time'].min(), cat_pred['time'].min())
+        max = np.maximum(cat_true['time'].max(), cat_pred['time'].max())
+        nbins = ((max - min) / 0.1e9).astype(int)
+        count_true, _ = np.histogram(
+            cat_true['time'], range=(min, max), bins=nbins)
+        count_pred, _ = np.histogram(
+            cat_pred['time'], range=(min, max), bins=nbins)
+
+        total = np.sum(count_true)
+        diff = count_true-count_pred
+        fn = np.sum(np.where(diff > 0, diff, 0))
+        fp = np.sum(np.where(diff < 0, -diff, 0))
+        tp = np.minimum(count_true, count_pred).sum()
+        tn = total - tp - fp - fn
+        return np.array([[tp, fp], [fn, tn]])
+
+    def event_confusion(self):
+        return np.mean(self._event_confusion, axis=0)
+
+    def event_precision(self):
+        return np.round(self.event_confusion()[0, 0] /
+                        (self.event_confusion()[0, 1]
+                         + self.event_confusion()[0, 0]), 3)
+
+    def event_recall(self):
+        return np.round(self.event_confusion()[0, 0] /
+                        (self.event_confusion()[1, 0]
+                         + self.event_confusion()[0, 0]), 3)
 
     def ari(self):
         return np.round(np.mean(self._ari), 3)
