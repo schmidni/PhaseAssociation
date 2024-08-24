@@ -42,7 +42,7 @@ def create_synthetic_data(out_dir: Path,
         catalog = create_synthetic_catalog(
             n, duration, *center, startdate=startdate, event_times=event_times)
         arrivals = create_associations(catalog, stations, v_p, v_s, 60,
-                                       duration, startdate=startdate,
+                                       startdate=startdate,
                                        add_noise=add_noise,
                                        noise_factor=noise_factor)
 

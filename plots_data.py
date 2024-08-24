@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from matplotlib.ticker import FuncFormatter
+from scipy.spatial import distance_matrix
 
 from src.synthetics.seismicity_samples_Dieterich94 import (
     get_rectangular_slippatch_from_FM, get_seismicity_sample_from_Dieterich94,
@@ -166,5 +167,32 @@ for group, df in arrivals.groupby('event'):
 
 fig.show()
 
+
+# %% Plot Noise ##############################################################
+
+stations = pd.read_csv('stations/station_cords_blab_VALTER.csv')
+stations.rename(columns={'station_code': 'id'}, inplace=True)
+stations = stations[['id', 'x', 'y', 'z']]
+
+catalog = pd.read_csv(
+    'plots/data/rate/catalog_0.csv', parse_dates=['time'], index_col=0)
+catalog = catalog.set_index('time', drop=True)
+
+distances = distance_matrix(
+    catalog[['e', 'n', 'u']], stations[['x', 'y', 'z']])
+
+tt_p = distances/5500 * 1e3
+
+noise = np.random.normal(0, tt_p*0.1, tt_p.shape)
+
+# plot a histogram of noise values
+
+plt.figure(figsize=(16, 12))
+plt.hist(noise.flatten(), bins=200, color='blue')
+plt.xlabel('Noise [ms]', fontsize=labelsize)
+plt.ylabel('Arrivals', fontsize=labelsize)
+plt.xticks(fontsize=ticksize)
+plt.yticks(fontsize=ticksize)
+plt.show()
 
 # %%
