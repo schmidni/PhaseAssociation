@@ -60,8 +60,8 @@ def create_associations(catalog: pd.DataFrame,
     event_times = np.array(catalog.time.values)
 
     # arrival times
-    tt_p = distances/v_p * 1e6
-    tt_s = distances/v_s * 1e6
+    tt_p = distances/v_p * 1e9
+    tt_s = distances/v_s * 1e9
 
     if add_noise:  # add noise to travel times
         tt_p += np.random.normal(
@@ -126,9 +126,12 @@ def create_associations(catalog: pd.DataFrame,
         events_noise = np.full(n_noise, -1)
 
         # sample random times uniformly distributed
+        actual_duration = at_s_np['time'].max() - startdate
+        actual_duration = actual_duration.total_seconds() * 1e9
+
         times_noise = \
             pd.to_timedelta(
-                np.random.uniform(0, duration*1e9, n_noise), 'ns') \
+                np.random.uniform(0, actual_duration, n_noise), 'ns') \
             + pd.to_datetime(startdate)
 
         # sample random phases
