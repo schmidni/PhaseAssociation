@@ -29,7 +29,7 @@ config_pyocto = pyocto.OctoAssociator(
     ylim=(0, -0.15),
     zlim=(0, 0.25),
 
-    time_before=1,  # 300,
+    time_before=0.1,  # 300,
 
     velocity_model=velocity_model,
 
@@ -51,8 +51,8 @@ config_pyocto = pyocto.OctoAssociator(
     max_pick_overlap=4,  # 4, max number of picks shared between events
 
     refinement_iterations=3,  # 3,
-    time_slicing=5,  # 1200.0,
-    node_log_interval=0,  # 0,
+    time_slicing=0.001,  # 1200.0,
+    node_log_interval=0,  # 0, # logging interval in seconds
 
     location_split_depth=6,  # 6,
     location_split_return=4,  # 4,
@@ -66,8 +66,8 @@ config_gamma = {
     "vel": {"p": 5.5, "s": 2.7},
     "method": "BGMM",
     "oversample_factor": 5,  # factor on the number of initial clusters
-    "z(km)": (-0.1, 0.1),
-    "covariance_prior": [5e-3, 2.0],  # time, amplitude
+    "z(km)": (-1, 1),
+    "covariance_prior": [1e-5, 5],  # time, amplitude
     "bfgs_bounds": (    # bounds in km
         (-1, 1),        # x
         (-1, 1),        # y
@@ -76,12 +76,12 @@ config_gamma = {
     ),
     "use_dbscan": True,
     "dbscan_eps": 0.01,  # seconds
-    "dbscan_min_samples": 3,
+    "dbscan_min_samples": 5,
 
-    "min_picks_per_eq": 2,
-    "max_sigma11": 4.0,
+    "min_picks_per_eq": 8,
+    "max_sigma11": 0.01,
     "max_sigma22": 2.0,
-    "max_sigma12": 2.0
+    # "max_sigma12": 2.0
 }
 
 data_config = {
@@ -89,25 +89,25 @@ data_config = {
         "min_events": 8,
         "max_events": 12,
         "add_noise": True,
-        "noise_factor": 5
+        "noise_factor": 1
     },
     "medium": {
         "min_events": 25,
         "max_events": 35,
         "add_noise": True,
-        "noise_factor": 5
+        "noise_factor": 1
     },
     "hard": {
         "min_events": 40,
         "max_events": 60,
         "add_noise": True,
-        "noise_factor": 5
+        "noise_factor": 1
     },
     "veryhard": {
         "min_events": 90,
         "max_events": 110,
         "add_noise": True,
-        "noise_factor": 5
+        "noise_factor": 1
     }
 }
 
@@ -199,6 +199,7 @@ ax[0, 0].plot(PyOcto_ari, label='PyOcto')
 ax[0, 0].set_title('ARI')
 ax[0, 0].set_xticks(range(len(data_config.keys())))
 ax[0, 0].set_xticklabels(lables)
+ax[0, 0].set_ylim([0, 1])
 ax[0, 0].legend()
 
 ax[0, 1].plot(GaMMA_accuracy, label='GaMMA')
@@ -206,6 +207,7 @@ ax[0, 1].plot(PyOcto_accuracy, label='PyOcto')
 ax[0, 1].set_title('Accuracy')
 ax[0, 1].set_xticks(range(len(data_config.keys())))
 ax[0, 1].set_xticklabels(lables)
+ax[0, 1].set_ylim([0, 1])
 ax[0, 1].legend()
 
 ax[1, 0].plot(GaMMA_precision, label='GaMMA')
@@ -213,6 +215,7 @@ ax[1, 0].plot(PyOcto_precision, label='PyOcto')
 ax[1, 0].set_title('Precision')
 ax[1, 0].set_xticks(range(len(data_config.keys())))
 ax[1, 0].set_xticklabels(lables)
+ax[1, 0].set_ylim([0, 1])
 ax[1, 0].legend()
 
 ax[1, 1].plot(GaMMA_recall, label='GaMMA')
@@ -220,6 +223,7 @@ ax[1, 1].plot(PyOcto_recall, label='PyOcto')
 ax[1, 1].set_title('Recall')
 ax[1, 1].set_xticks(range(len(data_config.keys())))
 ax[1, 1].set_xticklabels(lables)
+ax[1, 1].set_ylim([0, 1])
 ax[1, 1].legend()
 
 plt.show()

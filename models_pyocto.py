@@ -11,7 +11,7 @@ from src.clustering.utils import ClusterStatistics, plot_arrivals
 velocity_model = pyocto.VelocityModel0D(
     p_velocity=5.5,
     s_velocity=2.7,
-    tolerance=0.1,
+    tolerance=0.01,
 )
 
 associator = pyocto.OctoAssociator(
@@ -19,7 +19,7 @@ associator = pyocto.OctoAssociator(
     ylim=(0, -0.15),
     zlim=(0, 0.25),
 
-    time_before=1,  # 300,
+    time_before=0.1,  # 300,
 
     velocity_model=velocity_model,
 
@@ -41,7 +41,7 @@ associator = pyocto.OctoAssociator(
     max_pick_overlap=4,  # 4, max number of picks shared between events
 
     refinement_iterations=3,  # 3,
-    time_slicing=5,  # 1200.0,
+    time_slicing=0.001,  # 1200.0,
     node_log_interval=0,  # 0, # logging interval in seconds
 
     location_split_depth=6,  # 6,

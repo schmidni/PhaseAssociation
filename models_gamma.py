@@ -1,6 +1,7 @@
 # %% Imports and Configuration
 import pandas as pd
 import tqdm
+from sklearn.metrics import pair_confusion_matrix as PCM
 
 from src.clustering.dataset import (GaMMAPickFormat, GaMMAStationFormat,
                                     PhasePicksDataset)
@@ -13,9 +14,9 @@ config = {
     "use_amplitude": True,
     "vel": {"p": 5.5, "s": 2.7},
     "method": "BGMM",
-    "oversample_factor": 5,  # factor on the number of initial clusters
-    "z(km)": (-0.1, 0.1),
-    "covariance_prior": [5e-3, 2.0],  # time, amplitude
+    "oversample_factor": 10,  # factor on the number of initial clusters
+    "z(km)": (-1, 1),
+    "covariance_prior": [1e-5, 5],  # time, amplitude
     "bfgs_bounds": (    # bounds in km
         (-1, 1),        # x
         (-1, 1),        # y
@@ -24,12 +25,12 @@ config = {
     ),
     "use_dbscan": True,
     "dbscan_eps": 0.01,  # seconds
-    "dbscan_min_samples": 3,
+    "dbscan_min_samples": 5,
 
-    "min_picks_per_eq": 2,
-    "max_sigma11": 4.0,
+    "min_picks_per_eq": 8,
+    "max_sigma11": 0.01,
     "max_sigma22": 2.0,
-    "max_sigma12": 2.0
+    # "max_sigma12": 2.0
 }
 
 # %% Run GaMMA
@@ -69,5 +70,11 @@ plot_arrivals(associations[['dx', 'time']],
               sample.catalog[['dx', 'time']],
               cat_gmma[['dx', 'time']],
               sample.y.to_numpy(), labels_pred)
+# %%
+labels = sample.y.to_numpy()
 
+mask = (labels == -1) & (labels_pred == -1)
+
+pcm = PCM(labels[~mask], labels_pred[~mask])
+print(pcm)
 # %%
