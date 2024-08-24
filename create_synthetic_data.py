@@ -18,7 +18,11 @@ def create_synthetic_data(out_dir: Path,
                           duration: int,
                           stations: pd.DataFrame,
                           add_noise: bool = True,
-                          noise_factor: float = 1):
+                          noise_factor: float = 1,
+                          idx: int = 1,
+                          startdate: datetime = datetime.now(),
+                          event_times: np.ndarray | None = None,
+                          del_folder: bool = True):
 
     center = np.array(
         [stations['e'].mean(), stations['n'].mean(), stations['u'].mean()])
@@ -26,9 +30,8 @@ def create_synthetic_data(out_dir: Path,
     v_p = 5500.  # m/s
     v_s = 2700.  # m/s
 
-    startdate = datetime.now()
-
-    shutil.rmtree(out_dir, ignore_errors=True)
+    if del_folder:
+        shutil.rmtree(out_dir, ignore_errors=True)
     out_dir.mkdir(parents=True, exist_ok=True)
 
     stations.to_csv(f'{out_dir}/stations.csv', index=False)
@@ -37,22 +40,23 @@ def create_synthetic_data(out_dir: Path,
     for i in tqdm.tqdm(range(n_catalogs)):
         n = np.random.randint(min_events, max_events+1)  # random int
         catalog = create_synthetic_catalog(
-            n, duration, *center, startdate=startdate)
+            n, duration, *center, startdate=startdate, event_times=event_times)
         arrivals = create_associations(catalog, stations, v_p, v_s, 60,
                                        duration, startdate=startdate,
                                        add_noise=add_noise,
                                        noise_factor=noise_factor)
-        arrivals.to_csv(f'{out_dir}/arrivals_{i}.csv', index=False)
-        catalog.to_csv(f'{out_dir}/catalog_{i}.csv', index=True)
+
+        arrivals.to_csv(f'{out_dir}/arrivals_{(i+1)*idx}.csv', index=False)
+        catalog.to_csv(f'{out_dir}/catalog_{(i+1)*idx}.csv', index=True)
 
 
 if __name__ == '__main__':
     stations = inventory_to_stations('stations/station_cords_blab_VALTER.csv')
     out_dir = Path('data/raw')
-    min_events = 5
-    max_events = 5
-    duration = 5
-    n_catalogs = 1
+    min_events = 190
+    max_events = 210
+    duration = 20
+    n_catalogs = 10
     add_noise = True
     noise_factor = 1
 

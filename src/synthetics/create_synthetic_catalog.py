@@ -14,7 +14,8 @@ def create_synthetic_catalog(n_events: int,
                              e: float,
                              n: float,
                              u: float,
-                             startdate: datetime = datetime.now()
+                             startdate: datetime = datetime.now(),
+                             event_times: np.ndarray = None
                              ) -> pd.DataFrame:
 
     # Specify reference focal mechanism
@@ -38,7 +39,10 @@ def create_synthetic_catalog(n_events: int,
     catalog = pd.DataFrame({k: catalog[k] for k in keep})
 
     rate = duration/n_events
-    event_times = generate_poisson_events(rate, n_events)
+
+    if event_times is None:
+        event_times = generate_poisson_events(rate, n_events)
+
     catalog['time'] = event_times
     catalog.time = pd.to_timedelta(catalog.time, 's')
     catalog.time = catalog.time + startdate
