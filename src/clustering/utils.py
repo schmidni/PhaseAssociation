@@ -15,7 +15,18 @@ class ClusterStatistics:
         self._event_confusion = []
 
     def add(self, labels, labels_pred, cat_true=None, cat_pred=None):
+
+        mask = (labels == -1) & (labels_pred == -1)
+
+        labels = labels[~mask]
+        labels[labels == -1] = np.arange(1e6, 1e6+len(labels[labels == -1]))
+
+        labels_pred = labels_pred[~mask]
+        labels_pred[labels_pred == -1] = \
+            np.arange(2e6, 2e6+len(labels_pred[labels_pred == -1]))
+
         self._ari.append(ARI(labels, labels_pred))
+
         self._pcm.append(PCM(labels, labels_pred))
 
         if cat_true is not None and cat_pred is not None:
@@ -88,26 +99,26 @@ def plot_arrivals(arrivals, cat, cat_pred, labels, labels_pred):
 
     # prediction
     for idx in range(len(np.unique(labels_pred))):
-        ax[1].scatter(arrivals.loc[labels_pred == idx, 'time'] / 1000,
+        ax[1].scatter(arrivals.loc[labels_pred == idx, 'time'],
                       arrivals.loc[labels_pred == idx, 'dx'],
                       color=color_iter.__next__(), s=80
                       )
 
-    ax[1].scatter(arrivals.loc[labels_pred == -1, 'time'] / 1000,
+    ax[1].scatter(arrivals.loc[labels_pred == -1, 'time'],
                   arrivals.loc[labels_pred == -1, 'dx'],
                   color='black', s=20)
-    ax[1].scatter(cat_pred['time'] / 1000, cat_pred['dx'],
+    ax[1].scatter(cat_pred['time'], cat_pred['dx'],
                   color='darkorange', marker='x')
 
     # truth
     for idx in range(len(np.unique(labels))):
-        ax[0].scatter(arrivals.loc[labels == idx, 'time'] / 1000,
+        ax[0].scatter(arrivals.loc[labels == idx, 'time'],
                       arrivals.loc[labels == idx, 'dx'],
                       color=color_iter.__next__(), s=80
                       )
-    ax[0].scatter(cat['time'] / 1000, cat['dx'],
+    ax[0].scatter(cat['time'], cat['dx'],
                   color='darkorange', marker='x')
-    ax[0].scatter(arrivals.loc[labels == -1, 'time'] / 1000,
+    ax[0].scatter(arrivals.loc[labels == -1, 'time'],
                   arrivals.loc[labels == -1, 'dx'],
                   color='black', s=20)
 

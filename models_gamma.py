@@ -1,7 +1,6 @@
 # %% Imports and Configuration
 import pandas as pd
 import tqdm
-from sklearn.metrics import pair_confusion_matrix as PCM
 
 from src.clustering.dataset import (GaMMAPickFormat, GaMMAStationFormat,
                                     PhasePicksDataset)
@@ -70,11 +69,4 @@ plot_arrivals(associations[['dx', 'time']],
               sample.catalog[['dx', 'time']],
               cat_gmma[['dx', 'time']],
               sample.y.to_numpy(), labels_pred)
-# %%
-labels = sample.y.to_numpy()
-
-mask = (labels == -1) & (labels_pred == -1)
-
-pcm = PCM(labels[~mask], labels_pred[~mask])
-print(pcm)
 # %%
