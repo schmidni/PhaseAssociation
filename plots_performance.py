@@ -88,25 +88,31 @@ data_config = {
     "easy": {
         "min_events": 8,
         "max_events": 12,
-        "add_noise": True,
+        "add_noise": False,
         "noise_factor": 1
     },
     "medium": {
-        "min_events": 25,
-        "max_events": 35,
-        "add_noise": True,
+        "min_events": 40,
+        "max_events": 60,
+        "add_noise": False,
         "noise_factor": 1
     },
     "hard": {
-        "min_events": 40,
-        "max_events": 60,
-        "add_noise": True,
+        "min_events": 90,
+        "max_events": 110,
+        "add_noise": False,
         "noise_factor": 1
     },
     "veryhard": {
-        "min_events": 90,
-        "max_events": 110,
-        "add_noise": True,
+        "min_events": 450,
+        "max_events": 550,
+        "add_noise": False,
+        "noise_factor": 1
+    },
+    "extremelyhard": {
+        "min_events": 950,
+        "max_events": 1050,
+        "add_noise": False,
         "noise_factor": 1
     }
 }
@@ -191,7 +197,7 @@ PyOcto_precision = np.array([stat_pyocto[key].precision()
 PyOcto_recall = np.array([stat_pyocto[key].recall()
                          for key in data_config.keys()])
 
-lables = ['1/s', '3/s', '5/s', '10/s']
+lables = ['1/s', '5/s', '10/s', '50/s', '100/s']
 
 fig, ax = plt.subplots(2, 2, figsize=(10, 10))
 ax[0, 0].plot(GaMMA_ari, label='GaMMA')
