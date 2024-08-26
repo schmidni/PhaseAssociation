@@ -147,8 +147,6 @@ for key, value in data_config.items():
 
 # %%
 for key, ds in datasets.items():
-    # if not key == 'medium':
-    #     continue
     print(f"Running {key} dataset")
     for sample in tqdm(ds):
         cat_gmma, labels_pred = run_gamma(sample.x, ds.stations, config_gamma)
