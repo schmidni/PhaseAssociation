@@ -283,6 +283,7 @@ def associate(
             # mean_precision_prior=mean_precision_prior,
             covariance_prior=covariance_prior,
             init_params="centers",
+            n_init=config.get("n_init", 1),
             centers_init=centers_init.copy(),
             station_locs=locs_,
             phase_type=phase_type_,

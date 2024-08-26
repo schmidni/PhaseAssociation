@@ -22,7 +22,8 @@ def create_synthetic_data(out_dir: Path,
                           idx: int = 1,
                           startdate: datetime = datetime.now(),
                           event_times: np.ndarray | None = None,
-                          del_folder: bool = True):
+                          del_folder: bool = True,
+                          fixed_mag: float | None = None):
 
     center = np.array(
         [stations['e'].mean(), stations['n'].mean(), stations['u'].mean()])
@@ -39,8 +40,13 @@ def create_synthetic_data(out_dir: Path,
     print("Creating synthetic catalogs...")
     for i in tqdm.tqdm(range(n_catalogs)):
         n = np.random.randint(min_events, max_events+1)  # random int
-        catalog = create_synthetic_catalog(
-            n, duration, *center, startdate=startdate, event_times=event_times)
+        catalog = create_synthetic_catalog(n,
+                                           duration,
+                                           *center,
+                                           startdate=startdate,
+                                           event_times=event_times,
+                                           fixed_mag=fixed_mag)
+
         arrivals = create_associations(catalog, stations, v_p, v_s, 60,
                                        startdate=startdate,
                                        add_noise=add_noise,

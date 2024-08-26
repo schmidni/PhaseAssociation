@@ -15,7 +15,8 @@ def create_synthetic_catalog(n_events: int,
                              n: float,
                              u: float,
                              startdate: datetime = datetime.now(),
-                             event_times: np.ndarray = None
+                             event_times: np.ndarray = None,
+                             fixed_mag: float | None = None
                              ) -> pd.DataFrame:
 
     # Specify reference focal mechanism
@@ -47,7 +48,10 @@ def create_synthetic_catalog(n_events: int,
     catalog.time = pd.to_timedelta(catalog.time, 's')
     catalog.time = catalog.time + startdate
 
-    mags = simulate_magnitudes(n_events, 1.6*np.log(10), -3.5)
-    catalog['magnitude'] = mags
+    if fixed_mag is None:
+        mags = simulate_magnitudes(n_events, 1.6*np.log(10), -3.5)
+        catalog['magnitude'] = mags
+    else:
+        catalog['magnitude'] = np.full(n_events, fixed_mag)
 
     return catalog
