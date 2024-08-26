@@ -62,7 +62,7 @@ config_pyocto = pyocto.OctoAssociator(
 config_gamma = {
     "ncpu": 4,
     "dims": ['x(km)', 'y(km)', 'z(km)'],  # needs to be *(km), column names
-    "use_amplitude": True,
+    "use_amplitude": False,
     "vel": {"p": 5.5, "s": 2.7},
     "method": "BGMM",
     "oversample_factor": 5,  # factor on the number of initial clusters
@@ -86,34 +86,32 @@ config_gamma = {
 
 data_config = {
     "easy": {
-        "min_events": 8,
-        "max_events": 12,
-        "add_noise": False,
-        "noise_factor": 1
+        "min_events": 4,
+        "max_events": 6,
+        "add_noise": True,
+        "noise_factor": 1,
+        "label": "1"
     },
     "medium": {
-        "min_events": 40,
-        "max_events": 60,
-        "add_noise": False,
-        "noise_factor": 1
+        "min_events": 45,
+        "max_events": 55,
+        "add_noise": True,
+        "noise_factor": 1,
+        "label": "10"
     },
     "hard": {
-        "min_events": 90,
-        "max_events": 110,
-        "add_noise": False,
-        "noise_factor": 1
+        "min_events": 240,
+        "max_events": 260,
+        "add_noise": True,
+        "noise_factor": 1,
+        "label": "50"
     },
     "veryhard": {
         "min_events": 450,
         "max_events": 550,
-        "add_noise": False,
-        "noise_factor": 1
-    },
-    "extremelyhard": {
-        "min_events": 950,
-        "max_events": 1050,
-        "add_noise": False,
-        "noise_factor": 1
+        "add_noise": True,
+        "noise_factor": 1,
+        "label": "100"
     }
 }
 
@@ -121,7 +119,7 @@ datasets = {}
 stat_gamma = {}
 stat_pyocto = {}
 
-duration = 10
+duration = 5
 n_catalogs = 10
 
 for key, value in data_config.items():
@@ -197,7 +195,7 @@ PyOcto_precision = np.array([stat_pyocto[key].precision()
 PyOcto_recall = np.array([stat_pyocto[key].recall()
                          for key in data_config.keys()])
 
-lables = ['1/s', '5/s', '10/s', '50/s', '100/s']
+lables = [d['label'] for d in data_config.values()]
 
 fig, ax = plt.subplots(2, 2, figsize=(10, 10))
 ax[0, 0].plot(GaMMA_ari, label='GaMMA')
@@ -205,6 +203,7 @@ ax[0, 0].plot(PyOcto_ari, label='PyOcto')
 ax[0, 0].set_title('ARI')
 ax[0, 0].set_xticks(range(len(data_config.keys())))
 ax[0, 0].set_xticklabels(lables)
+ax[0, 0].set_xlabel('⌀ events / second')
 ax[0, 0].set_ylim([0, 1])
 ax[0, 0].legend()
 
@@ -213,6 +212,7 @@ ax[0, 1].plot(PyOcto_accuracy, label='PyOcto')
 ax[0, 1].set_title('Accuracy')
 ax[0, 1].set_xticks(range(len(data_config.keys())))
 ax[0, 1].set_xticklabels(lables)
+ax[0, 1].set_xlabel('⌀ events / second')
 ax[0, 1].set_ylim([0, 1])
 ax[0, 1].legend()
 
@@ -221,6 +221,7 @@ ax[1, 0].plot(PyOcto_precision, label='PyOcto')
 ax[1, 0].set_title('Precision')
 ax[1, 0].set_xticks(range(len(data_config.keys())))
 ax[1, 0].set_xticklabels(lables)
+ax[1, 0].set_xlabel('⌀ events / second')
 ax[1, 0].set_ylim([0, 1])
 ax[1, 0].legend()
 
@@ -229,6 +230,7 @@ ax[1, 1].plot(PyOcto_recall, label='PyOcto')
 ax[1, 1].set_title('Recall')
 ax[1, 1].set_xticks(range(len(data_config.keys())))
 ax[1, 1].set_xticklabels(lables)
+ax[1, 1].set_xlabel('⌀ events / second')
 ax[1, 1].set_ylim([0, 1])
 ax[1, 1].legend()
 

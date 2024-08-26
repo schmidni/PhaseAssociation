@@ -71,7 +71,7 @@ plt.xticks(fontsize=ticksize)
 plt.yticks(fontsize=ticksize)
 plt.show()
 
-
+# %%
 # Plot 3D hypocentre distribution & finite slip patch ########################
 
 stations = pd.read_csv('stations/station_cords_blab_VALTER.csv')
@@ -121,7 +121,7 @@ plot_rectangular_slippatch(ax, finsrc, 'm')
 ax.scatter(catalog['e'], catalog['n'], catalog['u'],
            '.', color=[.2, .2, .2], s=markersize)
 ax.scatter(stations_enu['x'], stations_enu['y'],
-           stations_enu['z'], 'o', color='r', s=markersize)
+           stations_enu['z'], marker='v', color='r', s=markersize)
 
 XYZ = np.array([catalog['e'], catalog['n'], catalog['u']]).T
 
