@@ -1,4 +1,5 @@
 # %%
+import multiprocessing
 from datetime import datetime
 from pathlib import Path
 
@@ -20,15 +21,14 @@ stations = inventory_to_stations('stations/station_cords_blab_VALTER.csv')
 out_dir = Path('data/sensitivity')
 
 config = {
-    "ncpu": 4,
+    "ncpu": multiprocessing.cpu_count()-1,
     "dims": ['x(km)', 'y(km)', 'z(km)'],  # needs to be *(km), column names
-    "use_amplitude": False,
+    "use_amplitude": True,
     "vel": {"p": 5.5, "s": 2.7},
     "method": "BGMM",
-    # "n_init": 3,
-    "oversample_factor": 5,  # factor on the number of initial clusters
+    "oversample_factor": 10,  # factor on the number of initial clusters
     "z(km)": (-1, 1),
-    "covariance_prior": [1e-5, 1e-10],  # time, amplitude
+    "covariance_prior": [1e-5, 1e-3],  # time, amplitude
     "bfgs_bounds": (    # bounds in km
         (-1, 1),        # x
         (-1, 1),        # y
@@ -37,10 +37,11 @@ config = {
     ),
     "use_dbscan": True,
     "dbscan_eps": 0.01,  # seconds
-    "dbscan_min_samples": 10,
+    "dbscan_min_samples": 5,
+
     "min_picks_per_eq": 8,
     "max_sigma11": 0.01,
-    "max_sigma22": 2,
+    "max_sigma22": 2.0,
     # "max_sigma12": 2.0
 }
 # %%

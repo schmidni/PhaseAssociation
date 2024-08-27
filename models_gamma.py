@@ -1,4 +1,6 @@
 # %% Imports and Configuration
+import multiprocessing
+
 import pandas as pd
 import tqdm
 
@@ -8,14 +10,14 @@ from src.clustering.models import run_gamma
 from src.clustering.utils import ClusterStatistics, plot_arrivals
 
 config = {
-    "ncpu": 4,
+    "ncpu": multiprocessing.cpu_count()-1,
     "dims": ['x(km)', 'y(km)', 'z(km)'],  # needs to be *(km), column names
     "use_amplitude": True,
     "vel": {"p": 5.5, "s": 2.7},
     "method": "BGMM",
     "oversample_factor": 10,  # factor on the number of initial clusters
     "z(km)": (-1, 1),
-    "covariance_prior": [1e-5, 5],  # time, amplitude
+    "covariance_prior": [1e-5, 1e-3],  # time, amplitude
     "bfgs_bounds": (    # bounds in km
         (-1, 1),        # x
         (-1, 1),        # y

@@ -1,4 +1,5 @@
 # %%
+import multiprocessing
 from pathlib import Path
 
 import numpy as np
@@ -60,14 +61,14 @@ config_pyocto = pyocto.OctoAssociator(
 )
 
 config_gamma = {
-    "ncpu": 4,
+    "ncpu": multiprocessing.cpu_count()-1,
     "dims": ['x(km)', 'y(km)', 'z(km)'],  # needs to be *(km), column names
-    "use_amplitude": False,
+    "use_amplitude": True,
     "vel": {"p": 5.5, "s": 2.7},
     "method": "BGMM",
-    "oversample_factor": 5,  # factor on the number of initial clusters
+    "oversample_factor": 10,  # factor on the number of initial clusters
     "z(km)": (-1, 1),
-    "covariance_prior": [1e-5, 5],  # time, amplitude
+    "covariance_prior": [1e-5, 1e-3],  # time, amplitude
     "bfgs_bounds": (    # bounds in km
         (-1, 1),        # x
         (-1, 1),        # y
