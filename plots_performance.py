@@ -85,47 +85,28 @@ config_gamma = {
     # "max_sigma12": 2.0
 }
 
-data_config = {
-    "easy": {
-        "min_events": 4,
-        "max_events": 6,
+duration = 60
+n_catalogs = 10
+
+events = np.arange(1, 10, 2)
+data_config = {}
+
+for n_events in events:
+    data_config[n_events] = {
+        "min_events": int(0.95*n_events*duration),
+        "max_events": int(1.05*n_events*duration),
         "add_noise": True,
         "noise_factor": 1,
-        "label": "1"
-    },
-    "medium": {
-        "min_events": 45,
-        "max_events": 55,
-        "add_noise": True,
-        "noise_factor": 1,
-        "label": "10"
-    },
-    "hard": {
-        "min_events": 240,
-        "max_events": 260,
-        "add_noise": True,
-        "noise_factor": 1,
-        "label": "50"
-    },
-    "veryhard": {
-        "min_events": 450,
-        "max_events": 550,
-        "add_noise": True,
-        "noise_factor": 1,
-        "label": "100"
+        "label": n_events
     }
-}
 
 datasets = {}
 stat_gamma = {}
 stat_pyocto = {}
 
-duration = 5
-n_catalogs = 10
-
 for key, value in data_config.items():
     if True:
-        create_synthetic_data(out_dir / Path(key),
+        create_synthetic_data(out_dir / Path(str(key)),
                               n_catalogs,
                               value['min_events'],
                               value['max_events'],
@@ -135,7 +116,7 @@ for key, value in data_config.items():
                               noise_factor=value['noise_factor'])
 
     datasets[key] = PhasePicksDataset(
-        root_dir=out_dir / Path(key),
+        root_dir=out_dir / Path(str(key)),
         stations_file='stations.csv',
         file_mask='arrivals_*.csv',
         catalog_mask='catalog_*.csv',
@@ -152,30 +133,21 @@ for key, ds in datasets.items():
     for sample in tqdm(ds):
         cat_gmma, labels_pred = run_gamma(sample.x, ds.stations, config_gamma)
         stat_gamma[key].add(sample.y.to_numpy(),
-                            labels_pred,
-                            sample.catalog,
-                            cat_gmma)
+                            labels_pred)
 
         events, labels_pred = run_pyocto(sample.x, ds.stations, config_pyocto)
         stat_pyocto[key].add(sample.y.to_numpy(),
-                             labels_pred,
-                             sample.catalog,
-                             events)
+                             labels_pred)
 
     print(f"GaMMA {key} ARI: {stat_gamma[key].ari()}, "
           f"Accuray: {stat_gamma[key].accuracy()}, "
           f"Precision: {stat_gamma[key].precision()}, "
           f"Recall: {stat_gamma[key].recall()}")
-    print(f"GaMMA event precision {key}: {stat_gamma[key].event_precision()}, "
-          f"GaMMA event recall {key}: {stat_gamma[key].event_recall()}")
 
     print(f"PyOcto {key} ARI: {stat_pyocto[key].ari()}, "
           f"Accuray: {stat_pyocto[key].accuracy()}, "
           f"Precision: {stat_pyocto[key].precision()}, "
           f"Recall: {stat_pyocto[key].recall()}")
-    print(f"PyOcto event precision {key}: "
-          f"{stat_pyocto[key].event_precision()}, "
-          f"PyOcto event recall {key}: {stat_pyocto[key].event_recall()}")
 
 # %%
 GaMMA_ari = np.array([stat_gamma[key].ari() for key in data_config.keys()])
@@ -235,4 +207,16 @@ ax[1, 1].legend()
 
 plt.show()
 
+# %%
+fontsize = 25
+ticksize = 20
+fig, ax = plt.subplots(figsize=(10, 10))
+ax.plot(GaMMA_ari, label='GaMMA')
+ax.plot(PyOcto_ari, label='PyOcto')
+ax.set_xticks(range(len(data_config.keys())))
+ax.set_xticklabels(lables, fontsize=ticksize)
+ax.set_xlabel('⌀ events / second', fontsize=fontsize)
+ax.set_ylim([0.5, 1.01])
+ax.set_ylabel('ARI', fontsize=fontsize)
+ax.legend(fontsize=ticksize)
 # %%
