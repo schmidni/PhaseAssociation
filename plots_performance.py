@@ -68,7 +68,7 @@ config_gamma = {
     "method": "BGMM",
     "oversample_factor": 10,  # factor on the number of initial clusters
     "z(km)": (-1, 1),
-    "covariance_prior": [1e-5, 1e-3],  # time, amplitude
+    "covariance_prior": [1e-5, 1e-4],  # time, amplitude
     "bfgs_bounds": (    # bounds in km
         (-1, 1),        # x
         (-1, 1),        # y
@@ -88,7 +88,7 @@ config_gamma = {
 duration = 60
 n_catalogs = 10
 
-events = np.arange(1, 10, 2)
+events = np.arange(1, 54, 5)
 data_config = {}
 
 for n_events in events:
@@ -205,8 +205,8 @@ ax[1, 1].set_xlabel('⌀ events / second')
 ax[1, 1].set_ylim([0, 1])
 ax[1, 1].legend()
 
-plt.show()
-
+# plt.show()
+plt.savefig('performance_1.png')
 # %%
 fontsize = 25
 ticksize = 20
@@ -219,4 +219,5 @@ ax.set_xlabel('⌀ events / second', fontsize=fontsize)
 ax.set_ylim([0.5, 1.01])
 ax.set_ylabel('ARI', fontsize=fontsize)
 ax.legend(fontsize=ticksize)
+fig.savefig('performance_2.png')
 # %%

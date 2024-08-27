@@ -26,8 +26,8 @@ def create_associations(catalog: pd.DataFrame,
                         add_noise: bool = True,
                         noise_factor: float = 1,
                         noise_tt: float = 0.05,
-                        noise_gmv: float = 0.05,
-                        pc_noise_picks: float = 0.3
+                        noise_gmv: float = 0.01,
+                        pc_noise_picks: float = 0.25
                         ) -> pd.DataFrame:
     """
     Create a synthetic dataset of phase picks for a given catalog of events.
