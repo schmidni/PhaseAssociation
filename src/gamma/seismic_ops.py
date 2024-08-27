@@ -229,17 +229,19 @@ def calc_time(event_loc, station_loc, phase_type, vel={"p": 6.0, "s": 6.0 / 1.75
     return tt
 
 
-def calc_mag(data, event_loc, station_loc, weight, min=-2, max=8):
+def calc_mag(data, event_loc, station_loc, weight, min=-8, max=8):
     dist = np.linalg.norm(event_loc[:, :-1] -
                           station_loc, axis=-1, keepdims=True)
     # mag_ = ( data - 2.48 + 2.76 * np.log10(dist) )
     # Picozzi et al. (2018) A rapid response magnitude scale...
-    c0, c1, c2, c3 = 1.08, 0.93, -0.015, -1.68
-    mag_ = (data - c0 - c3 * np.log10(np.maximum(dist, 0.1))) / c1 + 3.5
+    # c0, c1, c2, c3 = 1.08, 0.93, -0.015, -1.68
+    # mag_ = (data - c0 - c3 * np.log10(np.maximum(dist, 0.1))) / c1 + 3.5
     # Atkinson, G. M. (2015). Ground-Motion Prediction Equation...
     # c0, c1, c2, c3, c4 = (-4.151, 1.762, -0.09509, -1.669, -0.0006)
     # mag_ = (data - c0 - c3*np.log10(dist))/c1
     # mag = np.sum(mag_ * weight) / (np.sum(weight)+1e-6)
+    c0, c1, c2, c3 = 0.343, 0.775, 0, -1.423
+    mag_ = (data - c0 - c3*np.log10(dist*1e3))/c1
     # (Watanabe, 1971) https://www.jstage.jst.go.jp/article/zisin1948/24/3/24_3_189/_pdf/-char/ja
     # mag_ = 1.0/0.85 * (data + 1.73 * np.log10(np.maximum(dist, 0.1)) + 2.50)
     mu = np.sum(mag_ * weight) / (np.sum(weight) + 1e-6)
@@ -255,13 +257,16 @@ def calc_amp(mag, event_loc, station_loc):
                           station_loc, axis=-1, keepdims=True)
     # logA = mag + 2.48 - 2.76 * np.log10(dist)
     # Picozzi et al. (2018) A rapid response magnitude scale...
-    c0, c1, c2, c3 = 1.08, 0.93, -0.015, -1.68
-    logA = c0 + c1 * (mag - 3.5) + c3 * np.log10(np.maximum(dist, 0.1))
+    # c0, c1, c2, c3 = 1.08, 0.93, -0.015, -1.68
+    # logA = c0 + c1 * (mag - 3.5) + c3 * np.log10(np.maximum(dist, 0.1))
     # Atkinson, G. M. (2015). Ground-Motion Prediction Equation...
     # c0, c1, c2, c3, c4 = (-4.151, 1.762, -0.09509, -1.669, -0.0006)
     # logA = c0 + c1*mag + c3*np.log10(dist)
     # (Watanabe, 1971) https://www.jstage.jst.go.jp/article/zisin1948/24/3/24_3_189/_pdf/-char/ja
     # logA = 0.85 * mag - 2.50 - 1.73 * np.log10(np.maximum(dist, 0.1))
+
+    c0, c1, c2, c3 = 0.343, 0.775, 0, -1.423
+    logA = c0 + c1*mag + c3*np.log10(dist*1e3)
     return logA
 
 
