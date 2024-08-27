@@ -27,7 +27,7 @@ def create_associations(catalog: pd.DataFrame,
                         noise_factor: float = 1,
                         noise_tt: float = 0.05,
                         noise_gmv: float = 0.01,
-                        pc_noise_picks: float = 0.25
+                        pc_noise_picks: float = 0.1
                         ) -> pd.DataFrame:
     """
     Create a synthetic dataset of phase picks for a given catalog of events.
@@ -81,7 +81,7 @@ def create_associations(catalog: pd.DataFrame,
         noise_gmv = np.random.normal(
             0, gmvs*noise_factor*noise_gmv, gmvs.shape)
         gmvs += np.clip(noise_gmv, -0.99*gmvs, 3*gmvs)
-        gmvs = np.maximum(gmvs, 1e-6)
+        gmvs = np.maximum(gmvs, 1e-8)
 
     # calculate a cutoff and discard picks below the cutoff
     cutoff = np.percentile(gmvs, percentile)
@@ -140,8 +140,8 @@ def create_associations(catalog: pd.DataFrame,
         amplitudes_noise = at_s_np['amplitude'] \
             .sample(n_noise, replace=True).to_numpy()
         amplitudes_noise = np.random.normal(
-            amplitudes_noise, 0.3*amplitudes_noise*noise_factor)
-        amplitudes_noise = np.maximum(amplitudes_noise, 1e-6)
+            amplitudes_noise, 0.05*amplitudes_noise*noise_factor)
+        amplitudes_noise = np.maximum(amplitudes_noise, 1e-8)
 
         # assemble the noise picks to pandas dataframe
         noise_np = np.array(
