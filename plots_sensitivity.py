@@ -44,7 +44,7 @@ config = {
     # "max_sigma12": 2.0
 }
 # %%
-events_per_second = np.arange(0, 151, 5)[1:]
+events_per_second = np.arange(0, 121, 5)[1:]
 interevent = 1/events_per_second
 
 data_config = {}
