@@ -1,17 +1,17 @@
 # %%
-import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from matplotlib.ticker import FuncFormatter
 from scipy.spatial import distance_matrix
 
+from src.synthetics.butler_vanaswegen import Butler_VanAswegen_1993
 from src.synthetics.seismicity_samples_Dieterich94 import (
     get_rectangular_slippatch_from_FM, get_seismicity_sample_from_Dieterich94,
     plot_rectangular_slippatch, set_bounding_box)
 
 # matplotlib.use('TkAgg')
-matplotlib.use('Qt5Agg')
+# matplotlib.use('Qt5Agg')
 ticksize = 24
 labelsize = 26
 markersize = 200
@@ -132,67 +132,65 @@ plt.yticks(fontsize=ticksize)
 ax.tick_params(axis='z', labelsize=ticksize)
 plt.show()
 
-#
-# %% Plot arrivals ###########################################################
+
+# %% Plot Traveltime Noise ###################################################
 stations = pd.read_csv('stations/station_cords_blab_VALTER.csv')
 stations.rename(columns={'station_code': 'id'}, inplace=True)
 stations = stations[['id', 'x', 'y', 'z']]
 
-arrivals = pd.read_csv(
-    'plots/data/arrivals/arrivals_0.csv', parse_dates=['time'])
-arrivals['time'] = arrivals['time'] - arrivals['time'].min()
-arrivals['time'] = arrivals['time'].dt.microseconds
-
-arrivals = arrivals.join(stations.set_index('id'), on='station')
-
-fig, ax = plt.subplots(figsize=(16, 12))
-plt.xlabel('time [μs]', fontsize=labelsize)
-plt.ylabel('Station y-coordinate [m]', fontsize=labelsize)
-plt.xticks(fontsize=ticksize)
-plt.yticks(fontsize=ticksize)
-
-
-def format_func(x, pos):
-    return np.round(x, 2)
-
-
-# Apply the formatter to the x-axis
-plt.gca().xaxis.set_major_formatter(FuncFormatter(format_func))
-
-colors = ['blue', 'green', 'red', 'purple', 'orange',
-          'brown', 'pink', 'gray', 'olive', 'black']
-for group, df in arrivals.groupby('event'):
-    ax.scatter(df['time'], df['y'], marker='o',
-               color=colors[group], s=markersize)
-
-fig.show()
-
-
-# %% Plot Noise ##############################################################
-
-stations = pd.read_csv('stations/station_cords_blab_VALTER.csv')
-stations.rename(columns={'station_code': 'id'}, inplace=True)
-stations = stations[['id', 'x', 'y', 'z']]
-
-catalog = pd.read_csv(
-    'plots/data/rate/catalog_0.csv', parse_dates=['time'], index_col=0)
-catalog = catalog.set_index('time', drop=True)
+center = np.array(
+    [[stations['x'].mean(), stations['y'].mean(), stations['z'].mean()]])
 
 distances = distance_matrix(
-    catalog[['e', 'n', 'u']], stations[['x', 'y', 'z']])
+    center, stations[['x', 'y', 'z']].to_numpy())[0]
 
-tt_p = distances/5500 * 1e3
+distances = np.sort(distances)
 
-noise = np.random.normal(0, tt_p*0.1, tt_p.shape)
+tt_p = distances/5500
+tt_s = distances/2700
 
-# plot a histogram of noise values
+noise_p = np.random.normal(0, tt_p*0.05, tt_p.shape)
+noise_s = np.random.normal(0, tt_s*0.05, tt_s.shape)
+
+tt_p_n = tt_p + noise_p
+tt_s_n = tt_s + noise_s
 
 plt.figure(figsize=(16, 12))
-plt.hist(noise.flatten(), bins=200, color='blue')
-plt.xlabel('Noise [ms]', fontsize=labelsize)
-plt.ylabel('Arrivals', fontsize=labelsize)
+plt.scatter(distances, tt_p_n*1e3, color='#009E73', s=100)
+plt.scatter(distances, tt_s_n*1e3, color='#D55E00', s=100)
+plt.plot(distances, tt_p*1e3, color='#009E73')
+plt.plot(distances, tt_s*1e3, color='#D55E00')
+plt.xlabel('distance [m]', fontsize=labelsize)
+plt.ylabel('traveltime [ms]', fontsize=labelsize)
 plt.xticks(fontsize=ticksize)
 plt.yticks(fontsize=ticksize)
+plt.show()
+
+
+# %% Plot Amplitude Noise ###################################################
+plt.figure(figsize=(16, 12))
+magnitudes = [-4, -3, -2, -1]
+
+for mag in magnitudes:
+    gmvs = Butler_VanAswegen_1993(mag, distances)[0]
+    noise_gmv = np.random.normal(0, gmvs*0.05, gmvs.shape)
+    gmvs_n = gmvs + noise_gmv
+    plt.scatter(distances, gmvs_n, marker='x', color='#D55E00', s=125)
+    plt.plot(distances, gmvs, color='#009E73')
+    plt.annotate(xy=(distances[-1], gmvs[-1]),
+                 xytext=(-30, 20),
+                 textcoords='offset points',
+                 text=f'm={mag}',
+                 fontsize=20,
+                 annotation_clip=True,
+                 color='#009E73')
+
+plt.xlabel('distance [m]', fontsize=labelsize)
+plt.ylabel('pgv [m/s]', fontsize=labelsize)
+plt.xticks(fontsize=ticksize)
+plt.yticks(fontsize=ticksize)
+plt.yscale('log')
+plt.xscale('log')
 plt.show()
 
 # %%
