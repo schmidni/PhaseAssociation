@@ -24,6 +24,10 @@ def run_gamma(picks, stations, config):
         picks, stations, config, method=config["method"])
 
     events = pd.DataFrame(events)
+
+    if len(associations) == 0:
+        return events, np.full(len(picks), -1)
+
     events['time'] = pd.to_datetime(
         events['time'], unit='ns').values.astype(int)
     events['dx'] = PhasePicksDataset.get_distance(
