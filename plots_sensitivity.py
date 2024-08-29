@@ -1,12 +1,13 @@
 # %%
 import multiprocessing
 from datetime import datetime
+from multiprocessing import Pool
 from pathlib import Path
+from time import perf_counter
 
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-from tqdm import tqdm
 
 from create_synthetic_data import create_synthetic_data
 from src.clustering.dataset import (GaMMAPickFormat, GaMMAStationFormat,
@@ -16,12 +17,11 @@ from src.clustering.utils import ClusterStatistics, plot_arrivals
 from src.synthetics.create_associations import inventory_to_stations
 
 # %%
-
 stations = inventory_to_stations('stations/station_cords_blab_VALTER.csv')
 out_dir = Path('data/sensitivity')
 
 config = {
-    "ncpu": multiprocessing.cpu_count()-1,
+    "ncpu": 1,
     "dims": ['x(km)', 'y(km)', 'z(km)'],  # needs to be *(km), column names
     "use_amplitude": True,
     "vel": {"p": 5.5, "s": 2.7},
@@ -35,7 +35,7 @@ config = {
         (-1, 1),        # depth
         (None, None),   # t
     ),
-    "use_dbscan": True,
+    "use_dbscan": False,
     "dbscan_eps": 0.01,  # seconds
     "dbscan_min_samples": 5,
 
@@ -54,7 +54,7 @@ for j, i in enumerate(interevent):
         "duration": 5*i,
         "label": str(i),
         "ticklabel": 1/i,
-        "mag": -2
+        # "mag": -2
     }
 # %%
 datasets = {}
@@ -63,7 +63,7 @@ last_sample = {}
 plot = False
 
 events = 4
-n_catalogs = 100
+n_catalogs = 50
 add_noise = True
 noise_factor = 1
 startdate = pd.to_datetime(datetime.now())
@@ -80,7 +80,8 @@ for key, value in data_config.items():
                           noise_factor=noise_factor,
                           event_times=event_times,
                           startdate=startdate,
-                          fixed_mag=-value['mag'],)
+                          #   fixed_mag=-value['mag'],
+                          )
 
     datasets[key] = PhasePicksDataset(
         root_dir=out_dir / Path(str(key)),
@@ -92,23 +93,29 @@ for key, value in data_config.items():
     )
     stats[key] = ClusterStatistics()
 
+
 # %%
 for key, ds in datasets.items():
-    print(f"Running {key} dataset")
+    print(f"Running dataset {key}...")
+    start = perf_counter()
+    inp = [(sample.x, ds.stations, config) for sample in ds]
+    n_threads = multiprocessing.cpu_count()-1
+    with Pool(n_threads) as pool:
+        results = pool.starmap(run_gamma, inp)
 
-    for sample in tqdm(ds):
-
-        cat_gmma, labels_pred = run_gamma(sample.x, ds.stations, config)
-
+    for sample, (cat_gmma, labels_pred) in zip(ds, results):
         stats[key].add(sample.y.to_numpy(),
                        labels_pred
                        )
 
-    print(f"GaMMA ARI: {stats[key].ari()}, Accuray: {stats[key].accuracy()}, "
+    print(f"GaMMA ARI: {stats[key].ari()}, "
+          f"Accuray: {stats[key].accuracy()}, "
           f"Precision: {stats[key].precision()}, "
-          f"Recall: {stats[key].recall()}")
+          f"Recall: {stats[key].recall()}, "
+          f"Duration: {round(perf_counter()-start,1)}s")
 
     last_sample[key] = (cat_gmma.copy(), labels_pred.copy(), sample)
+
 
 # %%
 linestyle = {'linestyle': '--',
