@@ -206,18 +206,4 @@ ax[1, 1].set_ylim([0, 1])
 ax[1, 1].legend()
 
 # plt.show()
-plt.savefig('performance_1.png')
-# %%
-fontsize = 25
-ticksize = 20
-fig, ax = plt.subplots(figsize=(10, 10))
-ax.plot(GaMMA_ari, label='GaMMA')
-ax.plot(PyOcto_ari, label='PyOcto')
-ax.set_xticks(range(len(data_config.keys())))
-ax.set_xticklabels(lables, fontsize=ticksize)
-ax.set_xlabel('⌀ events / second', fontsize=fontsize)
-ax.set_ylim([0.5, 1.01])
-ax.set_ylabel('ARI', fontsize=fontsize)
-ax.legend(fontsize=ticksize)
-fig.savefig('performance_2.png')
-# %%
+plt.savefig('performance.png')
