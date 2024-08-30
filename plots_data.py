@@ -30,7 +30,7 @@ bin_centers = (bins[:-1] + bins[1:]) / 2
 # Plot the scatter plot
 plt.figure(figsize=(16, 12))
 plt.scatter(bin_centers, counts, marker='^',
-            edgecolors='blue', facecolors='none', s=markersize)
+            edgecolors='#0072B2', facecolors='none', s=markersize)
 plt.yscale('log')
 # y scale minimum and maximum values
 plt.ylim(1, 1e5)
@@ -49,7 +49,7 @@ events_per_second = catalog_rate.resample('1s').size()
 
 # Step 2: Plot the resampled data
 plt.figure(figsize=(16, 12))
-events_per_second.plot(kind='bar', width=1, color='blue')
+events_per_second.plot(kind='bar', width=1, color='#0072B2')
 plt.xlabel('Time [min]', fontsize=labelsize)
 plt.ylabel('Number of Events', fontsize=labelsize)
 
@@ -156,34 +156,37 @@ tt_p_n = tt_p + noise_p
 tt_s_n = tt_s + noise_s
 
 plt.figure(figsize=(16, 12))
-plt.scatter(distances, tt_p_n*1e3, color='#009E73', s=100)
-plt.scatter(distances, tt_s_n*1e3, color='#D55E00', s=100)
+plt.scatter(distances, tt_p_n*1e3, color='#009E73', s=100, label='P-wave')
+plt.scatter(distances, tt_s_n*1e3, color='#D55E00', s=100, label='S-wave')
 plt.plot(distances, tt_p*1e3, color='#009E73')
 plt.plot(distances, tt_s*1e3, color='#D55E00')
 plt.xlabel('distance [m]', fontsize=labelsize)
 plt.ylabel('traveltime [ms]', fontsize=labelsize)
 plt.xticks(fontsize=ticksize)
 plt.yticks(fontsize=ticksize)
+plt.legend(fontsize=22)
 plt.show()
 
 
 # %% Plot Amplitude Noise ###################################################
 plt.figure(figsize=(16, 12))
 magnitudes = [-4, -3, -2, -1]
+colors = ['#D55E00', '#0072B2', '#CC79A7', '#009E73']
+for i, mag in enumerate(magnitudes):
 
-for mag in magnitudes:
     gmvs = Butler_VanAswegen_1993(mag, distances)[0]
     noise_gmv = np.random.normal(0, gmvs*0.05, gmvs.shape)
     gmvs_n = gmvs + noise_gmv
-    plt.scatter(distances, gmvs_n, marker='x', color='#D55E00', s=125)
-    plt.plot(distances, gmvs, color='#009E73')
+    plt.scatter(distances, gmvs_n, marker='x', color=colors[i],
+                s=125, label='noisy')
+    plt.plot(distances, gmvs, color=colors[i], label='theoretical')
     plt.annotate(xy=(distances[-1], gmvs[-1]),
                  xytext=(-30, 20),
                  textcoords='offset points',
                  text=f'm={mag}',
                  fontsize=20,
                  annotation_clip=True,
-                 color='#009E73')
+                 color=colors[i])
 
 plt.xlabel('distance [m]', fontsize=labelsize)
 plt.ylabel('pgv [m/s]', fontsize=labelsize)
@@ -191,6 +194,7 @@ plt.xticks(fontsize=ticksize)
 plt.yticks(fontsize=ticksize)
 plt.yscale('log')
 plt.xscale('log')
+plt.legend(['noisy', 'theoretical'], fontsize=22)
 plt.show()
 
 # %%
