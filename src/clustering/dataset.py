@@ -122,8 +122,8 @@ class GaMMAStationFormat:
 class NDArrayTransformX:
     def __init__(self,
                  device=None,
-                 drop_cols=['station'],
-                 cat_cols=['phase']):
+                 drop_cols=[],
+                 cat_cols=[]):
         self.drop_cols = drop_cols
         self.cat_cols = cat_cols
         self.device = device
