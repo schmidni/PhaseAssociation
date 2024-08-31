@@ -173,10 +173,11 @@ plt.figure(figsize=(16, 12))
 magnitudes = [-4, -3, -2, -1]
 colors = ['#D55E00', '#0072B2', '#CC79A7', '#009E73']
 for i, mag in enumerate(magnitudes):
-
     gmvs = Butler_VanAswegen_1993(mag, distances)[0]
-    noise_gmv = np.random.normal(0, gmvs*0.05, gmvs.shape)
-    gmvs_n = gmvs + noise_gmv
+
+    er = np.random.normal(0, np.abs(np.log10(gmvs))*0.05, gmvs.shape)
+    gmvs_n = gmvs * 10**er
+
     plt.scatter(distances, gmvs_n, marker='x', color=colors[i],
                 s=125, label='noisy')
     plt.plot(distances, gmvs, color=colors[i], label='theoretical')
