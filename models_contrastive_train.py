@@ -30,12 +30,6 @@ def scale_data(sample):
                         device=device)
 
 
-def noise(target):
-    # transformation if only noise/true pick should be differentiated
-    target = torch.where(target == -1, 0, 1)
-    return target
-
-
 ds = PhasePicksDataset(
     root_dir='data/raw',
     stations_file='stations.csv',
@@ -45,9 +39,7 @@ ds = PhasePicksDataset(
         NDArrayTransformX(drop_cols=['station'],
                           cat_cols=['phase']),
         scale_data]),
-    target_transform=transforms.Compose([NDArrayTransform(),
-                                        #  noise
-                                         ]),
+    target_transform=NDArrayTransform(),
     catalog_transform=NDArrayTransform(),
 )
 
@@ -57,12 +49,12 @@ n_feats = ds[0].x.shape[1]
 generator = torch.Generator().manual_seed(42)
 train_dataset, test_dataset = random_split(ds, [0.7, 0.3], generator=generator)
 
-test_loader = DataLoader(test_dataset, batch_size=1)
-train_loader = DataLoader(train_dataset, batch_size=1)
+test_loader = DataLoader(test_dataset, batch_size=1, shuffle=True)
+train_loader = DataLoader(train_dataset, batch_size=1, shuffle=True)
 
 pairs = []
 for i, ds in enumerate(train_loader):
-    a1, p, a2, n = lmu.get_all_pairs_indices(ds.y.squeeze())
+    a1, p, a2, n = lmu.get_all_pairs_indices(ds.y.squeeze()[:10000])
     pos = torch.randperm(len(a1))[:2500]
     neg = torch.randperm(len(a2))[:25000]
 
