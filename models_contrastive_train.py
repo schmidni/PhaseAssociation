@@ -1,4 +1,5 @@
 # %%
+import multiprocessing
 from time import time
 
 import matplotlib.pyplot as plt
@@ -46,21 +47,29 @@ ds = PhasePicksDataset(
 n_feats = ds[0].x.shape[1]
 
 # %%
-generator = torch.Generator().manual_seed(42)
-train_dataset, test_dataset = random_split(ds, [0.7, 0.3], generator=generator)
 
-test_loader = DataLoader(test_dataset, batch_size=1, shuffle=True)
-train_loader = DataLoader(train_dataset, batch_size=1, shuffle=True)
 
-pairs = []
-for i, ds in enumerate(train_loader):
+def parallel_pairs(ds):
     a1, p, a2, n = lmu.get_all_pairs_indices(ds.y.squeeze()[:10000])
     pos = torch.randperm(len(a1))[:2500]
     neg = torch.randperm(len(a2))[:25000]
 
     select = a1[pos], p[pos], a2[neg], n[neg]
 
-    pairs.append(tuple(p.to(device) for p in select))
+    return tuple(p for p in select)
+
+
+generator = torch.Generator().manual_seed(42)
+train_dataset, test_dataset = random_split(ds, [0.7, 0.3], generator=generator)
+
+test_loader = DataLoader(test_dataset, batch_size=1, shuffle=True)
+train_loader = DataLoader(train_dataset, batch_size=1, shuffle=True)
+
+multiprocessing.set_start_method('spawn', force=True)
+n_threads = multiprocessing.cpu_count()-1
+
+with multiprocessing.Pool(n_threads) as pool:
+    pairs = pool.map(parallel_pairs, train_loader)
 
 # %%
 

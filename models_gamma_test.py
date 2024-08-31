@@ -23,12 +23,12 @@ out_dir = Path('data/sensitivity')
 config = {
     "ncpu": 1,
     "dims": ['x(km)', 'y(km)', 'z(km)'],  # needs to be *(km), column names
-    "use_amplitude": False,
+    "use_amplitude": True,
     "vel": {"p": 5.5, "s": 2.7},
     "method": "BGMM",
     "oversample_factor": 10,  # factor on the number of initial clusters
     "z(km)": (-1, 1),
-    "covariance_prior": [1e-5, 1e-4],  # time, amplitude
+    "covariance_prior": [1e-5, 1e-2],  # time, amplitude
     "bfgs_bounds": (    # bounds in km
         (-1, 1),        # x
         (-1, 1),        # y
@@ -47,9 +47,9 @@ config = {
 # %%
 events_per_second = np.arange(0, 121, 5)[1:]
 
-events = 10
-n_catalogs = 1
-fixed_times = False
+events = 4
+n_catalogs = 3
+fixed_times = True
 
 plot = False
 add_noise = True
