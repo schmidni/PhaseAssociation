@@ -68,10 +68,11 @@ train_loader = DataLoader(train_dataset, batch_size=1)
 
 # n_threads = multiprocessing.cpu_count()-1
 n_threads = 4
+ys = [tl.y.squeeze().cpu().clone() for tl in train_loader]
 
 with multiprocessing.Pool(n_threads) as pool:
     results = pool.map(
-        parallel_pairs, [tl.y.squeeze().cpu() for tl in train_loader])
+        parallel_pairs, ys)
 
 pairs = [tuple(p.to(device) for p in r) for r in results]
 # %%
