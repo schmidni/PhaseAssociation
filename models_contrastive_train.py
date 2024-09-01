@@ -50,9 +50,9 @@ n_feats = ds[0].x.shape[1]
 
 
 def parallel_pairs(ds):
-    a1, p, a2, n = lmu.get_all_pairs_indices(ds.y.squeeze()[:10000])
-    pos = torch.randperm(len(a1))[:2500]
-    neg = torch.randperm(len(a2))[:25000]
+    a1, p, a2, n = lmu.get_all_pairs_indices(ds)
+    pos = torch.randperm(len(a1))[:2000]
+    neg = torch.randperm(len(a2))[:20000]
 
     select = a1[pos], p[pos], a2[neg], n[neg]
 
@@ -60,17 +60,20 @@ def parallel_pairs(ds):
 
 
 generator = torch.Generator().manual_seed(42)
-train_dataset, test_dataset = random_split(ds, [0.7, 0.3], generator=generator)
+train_dataset, test_dataset, _ = random_split(
+    ds, [0.7, 0.29, 0.01], generator=generator)
 
-test_loader = DataLoader(test_dataset, batch_size=1, shuffle=True)
-train_loader = DataLoader(train_dataset, batch_size=1, shuffle=True)
+test_loader = DataLoader(test_dataset, batch_size=1)
+train_loader = DataLoader(train_dataset, batch_size=1)
 
-multiprocessing.set_start_method('spawn', force=True)
-n_threads = multiprocessing.cpu_count()-1
+# n_threads = multiprocessing.cpu_count()-1
+n_threads = 4
 
 with multiprocessing.Pool(n_threads) as pool:
-    pairs = pool.map(parallel_pairs, train_loader)
+    results = pool.map(
+        parallel_pairs, [ds.y.squeeze().cpu() for ds in train_loader])
 
+pairs = [tuple(p.to(device) for p in r) for r in results]
 # %%
 
 
@@ -142,7 +145,7 @@ def test(loader):
 
 # %%
 start = time()
-for epoch in range(2):
+for epoch in range(10):
     train_loss = train(train_loader)
     test_ari = test(test_loader)
     end = time() - start
