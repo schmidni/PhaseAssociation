@@ -31,9 +31,9 @@ def scale_data(sample):
                         device=device)
 
 
-events_per_second = np.arange(0, 121, 5)[1:][3:8]
+events_per_second = np.arange(0, 121, 5)[1:]
 
-events = 10
+events = 30
 n_catalogs = 100
 fixed_times = False
 
@@ -97,11 +97,9 @@ class NN(torch.nn.Module):
         self.linear_relu_stack = nn.Sequential(
             nn.Linear(in_feats, h_feats, dtype=torch.float64),
             nn.ReLU(),
-            nn.Linear(h_feats, 2*h_feats, dtype=torch.float64),
+            nn.Linear(h_feats, h_feats, dtype=torch.float64),
             nn.ReLU(),
-            nn.Linear(2*h_feats, h_feats, dtype=torch.float64),
-            nn.ReLU(),
-            nn.Linear(h_feats, out_feats, dtype=torch.float64)
+            nn.Linear(h_feats, out_feats, dtype=torch.float64),
         )
 
     def forward(self, x):
@@ -109,6 +107,7 @@ class NN(torch.nn.Module):
         return logits
 
 
+# %%
 model = NN(n_feats, 64, 32).to(device)
 model.load_state_dict(torch.load('model', weights_only=True))
 

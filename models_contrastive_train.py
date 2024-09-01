@@ -23,6 +23,7 @@ from src.clustering.dataset import (NDArrayTransform, NDArrayTransformX,
 # %%
 # Load data
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+torch.multiprocessing.set_sharing_strategy('file_system')
 
 
 def scale_data(sample):
@@ -90,9 +91,11 @@ class NN(torch.nn.Module):
         self.linear_relu_stack = nn.Sequential(
             nn.Linear(in_feats, h_feats, dtype=torch.float64),
             nn.ReLU(),
-            nn.Linear(h_feats, h_feats, dtype=torch.float64),
+            nn.Linear(h_feats, 2*h_feats, dtype=torch.float64),
             nn.ReLU(),
-            nn.Linear(h_feats, out_feats, dtype=torch.float64),
+            nn.Linear(2*h_feats, h_feats, dtype=torch.float64),
+            nn.ReLU(),
+            nn.Linear(h_feats, out_feats, dtype=torch.float64)
         )
 
     def forward(self, x):
@@ -187,4 +190,4 @@ for i, data in enumerate(test_loader):
         break
 # %%
 
-torch.save(model.state_dict(), 'model2')
+torch.save(model.state_dict(), 'model')
