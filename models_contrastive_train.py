@@ -1,5 +1,6 @@
 # %%
 import multiprocessing
+from copy import deepcopy
 from time import time
 
 import matplotlib.pyplot as plt
@@ -63,12 +64,12 @@ generator = torch.Generator().manual_seed(42)
 train_dataset, test_dataset, _ = random_split(
     ds, [0.7, 0.29, 0.01], generator=generator)
 
-test_loader = DataLoader(test_dataset, batch_size=1)
-train_loader = DataLoader(train_dataset, batch_size=1)
+test_loader = DataLoader(test_dataset, batch_size=1, num_workers=0)
+train_loader = DataLoader(train_dataset, batch_size=1, num_workers=0)
 
 # n_threads = multiprocessing.cpu_count()-1
 n_threads = 4
-ys = [tl.y.squeeze().cpu().clone() for tl in train_loader]
+ys = [deepcopy(tl.y.squeeze().cpu()) for tl in train_loader]
 
 with multiprocessing.Pool(n_threads) as pool:
     results = pool.map(
