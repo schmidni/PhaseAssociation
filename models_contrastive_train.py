@@ -67,13 +67,18 @@ train_dataset, test_dataset, _ = random_split(
 test_loader = DataLoader(test_dataset, batch_size=1, num_workers=0)
 train_loader = DataLoader(train_dataset, batch_size=1, num_workers=0)
 
-# n_threads = multiprocessing.cpu_count()-1
+print('Data Loader Prepared')
+
 n_threads = 4
 ys = [deepcopy(tl.y.squeeze().cpu()) for tl in train_loader]
+
+print('Input Data for Pairs Prepared')
 
 with multiprocessing.Pool(n_threads) as pool:
     results = pool.map(
         parallel_pairs, ys)
+
+print('Pairs Calculated, moving to GPU...')
 
 pairs = [tuple(p.to(device) for p in r) for r in results]
 # %%
