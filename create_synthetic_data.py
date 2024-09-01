@@ -59,10 +59,10 @@ def create_synthetic_data(out_dir: Path,
 if __name__ == '__main__':
     stations = inventory_to_stations('stations/station_cords_blab_VALTER.csv')
     out_dir = Path('data/raw')
-    min_events = 10
+    min_events = 1
     max_events = 100
-    duration = 2
-    n_catalogs = 10
+    duration = 1
+    n_catalogs = 1000
     add_noise = True
     noise_factor = 1
 

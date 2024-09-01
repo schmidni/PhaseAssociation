@@ -78,7 +78,7 @@ def create_associations(catalog: pd.DataFrame,
     gmvs = np.apply_along_axis(butler_proxy, 0, distances)
 
     if add_noise:  # add noise to gmvs
-        er = np.random.normal(0, np.abs(np.log10(gmvs))*0.05, gmvs.shape)
+        er = np.random.normal(0, np.abs(np.log10(gmvs))*0.025, gmvs.shape)
         gmvs = gmvs * 10**er
 
     # calculate a cutoff and discard picks below the cutoff
