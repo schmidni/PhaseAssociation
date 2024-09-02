@@ -40,3 +40,7 @@ Contains the modified implementation of GaMMA.
 
 ### `src/synthetics`
 Contains scripts for generating synthetic data.
+
+
+## Disclaimer
+ChatGPT as well as Github Copliot was used to support the development of this code.
