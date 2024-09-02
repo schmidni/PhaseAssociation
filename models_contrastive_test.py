@@ -33,9 +33,9 @@ def scale_data(sample):
 
 events_per_second = np.arange(0, 121, 5)[1:]
 
-events = 30
+events = 4
 n_catalogs = 100
-fixed_times = False
+fixed_times = True
 
 plot = False
 add_noise = True
@@ -97,9 +97,11 @@ class NN(torch.nn.Module):
         self.linear_relu_stack = nn.Sequential(
             nn.Linear(in_feats, h_feats, dtype=torch.float64),
             nn.ReLU(),
-            nn.Linear(h_feats, h_feats, dtype=torch.float64),
+            nn.Linear(h_feats, 2*h_feats, dtype=torch.float64),
             nn.ReLU(),
-            nn.Linear(h_feats, out_feats, dtype=torch.float64),
+            nn.Linear(2*h_feats, h_feats, dtype=torch.float64),
+            nn.ReLU(),
+            nn.Linear(h_feats, out_feats, dtype=torch.float64)
         )
 
     def forward(self, x):
