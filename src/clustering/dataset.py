@@ -99,7 +99,8 @@ class GaMMAPickFormat:
                                         'phase': 'type',
                                         'amplitude': 'amp',
                                         'time': 'timestamp'})
-        sample = sample[['id', 'timestamp', 'type', 'amp']]
+        sample = sample[sample.columns.intersection(
+            ['id', 'timestamp', 'type', 'amp'])]
         sample['timestamp'] = pd.to_datetime(sample['timestamp'], unit='ns')
         sample['prob'] = 1
         return sample
