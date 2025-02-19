@@ -280,8 +280,8 @@ class BaseMixture(DensityMixin, BaseEstimator, metaclass=ABCMeta):
         #                   'or increase max_iter, tol '
         #                   'or check for degenerate data.'
         #                   % (init + 1), ConvergenceWarning)
-        # if not self.converged_:
-        #     print(f"\nInitialization {init + 1} did not converge.")
+        if not self.converged_:
+            print(f"\nInitialization {init + 1} did not converge.")
 
         self._set_parameters(best_params)
         self.n_iter_ = best_n_iter
