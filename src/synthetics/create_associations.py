@@ -23,10 +23,9 @@ def create_associations(catalog: pd.DataFrame,
                         v_s: float,
                         percentile: float,
                         startdate: datetime = datetime.now(),
-                        add_noise: bool = True,
-                        noise_factor: float = 1,
+                        add_noise_picks: bool = True,
                         noise_tt: float = 0.05,
-                        noise_gmv: float = 0.01,
+                        noise_gmv: float = 0.025,
                         pc_noise_picks: float = 0.1
                         ) -> pd.DataFrame:
     """
@@ -56,30 +55,29 @@ def create_associations(catalog: pd.DataFrame,
 
     distances = distance_matrix(
         catalog[['e', 'n', 'u']], stations[['e', 'n', 'u']])
-    event_times = np.array(catalog.time.values)
 
-    # arrival times
+    # travel times
+    event_times = np.array(catalog.time.values)
     tt_p = distances/v_p * 1e9
     tt_s = distances/v_s * 1e9
 
-    if add_noise:  # add noise to travel times
-        tt_p += np.random.normal(
-            0, noise_factor*tt_p*noise_tt, tt_p.shape)
-        tt_s += np.random.normal(
-            0, noise_factor*tt_s*noise_tt, tt_s.shape)
+    # add noise
+    tt_p += np.random.normal(0, tt_p*noise_tt, tt_p.shape)
+    tt_s += np.random.normal(0, tt_s*noise_tt, tt_s.shape)
 
     # calculate arrival times
     at_p = tt_p.astype('timedelta64[ns]') + event_times[:, np.newaxis]
     at_s = tt_s.astype('timedelta64[ns]') + event_times[:, np.newaxis]
 
+    # calculate gmvs
     def butler_proxy(distances):
         bva = np.vectorize(Butler_VanAswegen_1993)
         return bva(catalog['magnitude'], distances)[0]
     gmvs = np.apply_along_axis(butler_proxy, 0, distances)
 
-    if add_noise:  # add noise to gmvs
-        er = np.random.normal(0, np.abs(np.log10(gmvs))*0.025, gmvs.shape)
-        gmvs = gmvs * 10**er
+    # add multiplicative noise to gmvs
+    er = np.random.normal(0, np.abs(np.log10(gmvs))*noise_gmv, gmvs.shape)
+    gmvs = gmvs * 10**er
 
     # calculate a cutoff and discard picks below the cutoff
     cutoff = np.percentile(gmvs, percentile)
@@ -112,8 +110,8 @@ def create_associations(catalog: pd.DataFrame,
                ('amplitude', 'f8')])[detection_mask_np]
     at_s_np = pd.DataFrame(at_s_np)
 
-    if add_noise:  # add false picks to dataset
-        n_noise = int(len(at_p_np)*pc_noise_picks*noise_factor)
+    if add_noise_picks:  # add false picks to dataset
+        n_noise = int(len(at_p_np)*pc_noise_picks)
 
         # sample stations with replacement
         stations_noise = stations['id'].sample(
@@ -138,7 +136,7 @@ def create_associations(catalog: pd.DataFrame,
         amplitudes_noise = at_s_np['amplitude'] \
             .sample(n_noise, replace=True).to_numpy()
         amplitudes_noise = np.random.normal(
-            amplitudes_noise, 0.05*amplitudes_noise*noise_factor)
+            amplitudes_noise, 0.05*amplitudes_noise)
         amplitudes_noise = np.maximum(amplitudes_noise, 1e-8)
 
         # assemble the noise picks to pandas dataframe

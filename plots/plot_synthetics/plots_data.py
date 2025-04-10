@@ -18,8 +18,7 @@ markersize = 200
 
 # %%
 # FMD Plot ###################################################################
-catalog_fmd = pd.read_csv('plots/data/fmd/catalog_0.csv')
-
+catalog_fmd = pd.read_csv('data/fmd/catalog_0.csv')
 
 # Calculate histogram data
 counts, bins = np.histogram(catalog_fmd['magnitude'], bins=30)
@@ -41,13 +40,13 @@ plt.yticks(fontsize=ticksize)
 plt.show()
 
 # Rate Plot ##################################################################
-catalog_rate = pd.read_csv(
-    'plots/data/rate/catalog_0.csv', parse_dates=['time'], index_col=0)
+catalog_rate = pd.read_csv('data/rate/catalog_0.csv',
+                           parse_dates=['time'],
+                           index_col=0)
 catalog_rate = catalog_rate.set_index('time', drop=True)
 
 events_per_second = catalog_rate.resample('1s').size()
 
-# Step 2: Plot the resampled data
 plt.figure(figsize=(16, 12))
 events_per_second.plot(kind='bar', width=1, color='#0072B2')
 plt.xlabel('Time [min]', fontsize=labelsize)
@@ -74,7 +73,7 @@ plt.show()
 # %%
 # Plot 3D hypocentre distribution & finite slip patch ########################
 
-stations = pd.read_csv('stations/station_cords_blab_VALTER.csv')
+stations = pd.read_csv('../../stations/station_cords_blab_VALTER.csv')
 
 stations.rename(columns={'station_code': 'id'}, inplace=True)
 stations_enu = stations[['id', 'x', 'y', 'z']]
@@ -93,7 +92,6 @@ stressdrop = 1e6  # [Pa]
 
 # Plot properties
 view_angle = [-3, 90]
-plotme = False
 
 finsrc = get_rectangular_slippatch_from_FM(
     e0, n0, u0, stk0, dip0, mag, stressdrop)
@@ -104,7 +102,7 @@ cradius = finsrc['length']  # Crack radius, defines cluster size
 dx = cradius / 20  # Stdev of scatter around perfect plane
 
 catalog = get_seismicity_sample_from_Dieterich94(
-    neq, e0, n0, u0, stk0, dip0, cradius, dx, plotme)
+    neq, e0, n0, u0, stk0, dip0, cradius, dx)
 
 # 3D hypocentre distribution & finite slip patch
 fig = plt.figure(204, figsize=(16, 12))
@@ -134,7 +132,7 @@ plt.show()
 
 
 # %% Plot Traveltime Noise ###################################################
-stations = pd.read_csv('stations/station_cords_blab_VALTER.csv')
+stations = pd.read_csv('../../stations/station_cords_blab_VALTER.csv')
 stations.rename(columns={'station_code': 'id'}, inplace=True)
 stations = stations[['id', 'x', 'y', 'z']]
 

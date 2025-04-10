@@ -1,0 +1,19 @@
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
+
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["src*"]
+
+
+[project]
+name = "PhAssoc"
+dynamic = ["version"]
+description = ""
+readme = "README.md"
+
+requires-python = ">=3.12"
+
+dependencies = []

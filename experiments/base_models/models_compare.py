@@ -15,7 +15,6 @@ from src.clustering.utils import ClusterStatistics
 from src.synthetics.create_associations import inventory_to_stations
 
 # %%
-# generate 100 easy, 100 medium, 100 hard samples
 stations = inventory_to_stations('stations/station_cords_blab_VALTER.csv')
 out_dir = Path('data/performance')
 
@@ -64,7 +63,7 @@ config_gamma = {
     "ncpu": multiprocessing.cpu_count()-1,
     "dims": ['x(km)', 'y(km)', 'z(km)'],  # needs to be *(km), column names
     "use_amplitude": True,
-    "vel": {"p": 5.5, "s": 2.7},
+    "vel": {"p": 5.4, "s": 3.1},
     "method": "BGMM",
     "oversample_factor": 10,  # factor on the number of initial clusters
     "z(km)": (-1, 1),
@@ -85,10 +84,12 @@ config_gamma = {
     # "max_sigma12": 2.0
 }
 
-duration = 60
+# PARAMETERS ######
+duration = 30
 n_catalogs = 10
+# events = np.arange(1, 54, 5)
+events = np.array([1, 10, 20])
 
-events = np.arange(1, 54, 5)
 data_config = {}
 
 for n_events in events:
@@ -96,7 +97,6 @@ for n_events in events:
         "min_events": int(0.95*n_events*duration),
         "max_events": int(1.05*n_events*duration),
         "add_noise": True,
-        "noise_factor": 1,
         "label": n_events
     }
 
@@ -105,15 +105,14 @@ stat_gamma = {}
 stat_pyocto = {}
 
 for key, value in data_config.items():
-    if True:
-        create_synthetic_data(out_dir / Path(str(key)),
-                              n_catalogs,
-                              value['min_events'],
-                              value['max_events'],
-                              duration,
-                              stations,
-                              add_noise=value['add_noise'],
-                              noise_factor=value['noise_factor'])
+    create_synthetic_data(out_dir / Path(str(key)),
+                          n_catalogs,
+                          value['min_events'],
+                          value['max_events'],
+                          duration,
+                          stations,
+                          add_noise_picks=value['add_noise'],
+                          overwrite=True)
 
     datasets[key] = PhasePicksDataset(
         root_dir=out_dir / Path(str(key)),

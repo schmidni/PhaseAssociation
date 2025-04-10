@@ -67,7 +67,7 @@ for key, value in data_config.items():
                           value['events'],
                           value['duration'],
                           stations,
-                          add_noise=add_noise,
+                          add_noise_picks=add_noise,
                           noise_factor=noise_factor,
                           event_times=event_times if fixed_times else None,
                           startdate=startdate,

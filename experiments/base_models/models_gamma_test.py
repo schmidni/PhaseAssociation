@@ -62,7 +62,6 @@ stats = {}
 last_sample = {}
 
 for j, eps in enumerate(events_per_second):
-
     # if fixed times is true, add some spacing at start and end
     # and therefore increase the duration
     duration = 1/eps * (events + int(fixed_times))
@@ -81,7 +80,7 @@ for key, value in data_config.items():
                           value['events'],
                           value['duration'],
                           stations,
-                          add_noise=add_noise,
+                          add_noise_picks=add_noise,
                           noise_factor=noise_factor,
                           event_times=event_times if fixed_times else None,
                           startdate=startdate,
@@ -116,7 +115,7 @@ for key, ds in datasets.items():
           f"Accuray: {stats[key].accuracy()}, "
           f"Precision: {stats[key].precision()}, "
           f"Recall: {stats[key].recall()}, "
-          f"Duration: {round(perf_counter()-start,1)}s")
+          f"Duration: {round(perf_counter()-start, 1)}s")
 
     last_sample[key] = (cat_gmma.copy(), labels_pred.copy(), sample)
 

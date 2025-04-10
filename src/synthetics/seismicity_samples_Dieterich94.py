@@ -1,6 +1,6 @@
-import matplotlib.pyplot as plt
 import math
 
+import matplotlib.pyplot as plt
 import numpy as np
 from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 
@@ -23,15 +23,13 @@ def azidip2plane(e0, n0, u0, strike, dip, RS, RD):
 
 
 def sample_Dieterich94_stress_profile(
-        neq, crack_radius, events_inside_crack, plotme):
+        neq, crack_radius, events_inside_crack):
     # Compute stress profile from Dieterich 1994, eq. 20 and randomly sample
     # from it, to simulate aftershock distributions as a function of distance
     # from the main shock hypocentre. Then distribute these distances on a 2D
     # plane, by randomly sampling an azimuth.
     # Men-Andrin Meier, 26/5/2023
 
-    if plotme is None:
-        plotme = False
     if events_inside_crack is None:
         events_inside_crack = False
 
@@ -92,30 +90,14 @@ def sample_Dieterich94_stress_profile(
     quakes['xi'] = xi
     quakes['yi'] = yi
 
-    if plotme:
-        import matplotlib.pyplot as plt
-
-        plt.figure(1)
-        plt.subplot(1, 2, 1)
-        plt.plot(x, dtau0, '-r', linewidth=2)
-        plt.yscale('log')
-        plt.hist(ri, bins=np.arange(0, max(x), 0.05))
-
-        plt.subplot(1, 2, 2)
-        plt.plot(quakes['xi'], quakes['yi'], '.k')
-        plt.xlabel('x')
-        plt.ylabel('y')
-
-        plt.show()
-
     return quakes, stress
 
 
 def get_seismicity_sample_from_Dieterich94(
-        neq, e0, n0, u0, azi, dip, crack_radius, dx, plotme=False):
+        neq, e0, n0, u0, azi, dip, crack_radius, dx):
     # Get samples of quakes from stress profile
     cat, stress = sample_Dieterich94_stress_profile(
-        neq, crack_radius, 1, plotme)
+        neq, crack_radius, 1)
 
     # Distribute samples along plane with particular dip and rake
     # Use x- and y-values from sampled seismicity as
