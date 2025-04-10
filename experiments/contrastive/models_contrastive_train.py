@@ -175,7 +175,7 @@ for data in train_loader:
 
     ari += adjusted_rand_score(data.y.squeeze().cpu(), labels)
 
-print(f"ARI: {np.round(ari / len(train_loader),3)}")
+print(f"ARI: {np.round(ari / len(train_loader), 3)}")
 
 # %%
 
