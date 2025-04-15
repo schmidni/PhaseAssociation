@@ -53,5 +53,7 @@ def create_synthetic_data(out_dir: Path,
                                        startdate=startdate,
                                        add_noise_picks=add_noise_picks)
 
-        arrivals.to_csv(f'{out_dir}/arrivals_{i}.csv', index=False)
-        catalog.to_csv(f'{out_dir}/catalog_{i}.csv', index=True)
+        arrivals.to_csv(
+            f'{out_dir}/arrivals_{duration}_{min_events}_{i}.csv', index=False)
+        catalog.to_csv(
+            f'{out_dir}/catalog_{duration}_{min_events}_{i}.csv', index=True)
