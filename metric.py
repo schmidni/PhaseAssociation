@@ -5,6 +5,7 @@ from pytorch_metric_learning import distances, losses, miners, reducers  # noqa
 from pytorch_metric_learning.utils.accuracy_calculator import \
     AccuracyCalculator
 from pytorch_metric_learning.utils.inference import FaissKMeans
+from sklearn.cluster import KMeans
 # from pytorch_metric_learning.regularizers import LpRegularizer
 from sklearn.metrics import adjusted_rand_score
 from sklearn.preprocessing import MinMaxScaler  # , StandardScaler
@@ -34,7 +35,7 @@ def scale_data(sample):
 
 
 ds = PhasePicksDataset(
-    root_dir='data/reference/2s_20hz',
+    root_dir='data/reference/5s_5hz',
     stations_file='stations.csv',
     file_mask='arrivals_*.csv',
     catalog_mask='catalog_*.csv',
@@ -54,7 +55,7 @@ ds = PhasePicksDataset(
 
 generator = torch.Generator().manual_seed(42)
 train_dataset, test_dataset, _ = random_split(
-    ds, [0.89, 0.1, 0.01], generator=generator)
+    ds, [0.9, 0.09, 0.01], generator=generator)
 
 test_loader = DataLoader(test_dataset, batch_size=1, num_workers=0)
 train_loader = DataLoader(train_dataset, batch_size=1, num_workers=0)
@@ -89,7 +90,7 @@ n_features = ds[0].x.shape[1]
 model = NN(n_features, 64, 16).to(device)
 optimizer = torch.optim.Adam(model.parameters(), lr=1e-2)
 scheduler = torch.optim.lr_scheduler.StepLR(
-    optimizer, step_size=4000, gamma=0.9)
+    optimizer, step_size=1000, gamma=0.9)
 
 
 # %%
@@ -122,19 +123,12 @@ def train(model, loss_func, mining_func, device,
 
 
 # %% Testing Function
-class CustomAccuracyCalculator(AccuracyCalculator):
-    def calculate_ari(self, query_labels, cluster_labels, **kwargs):
-        return adjusted_rand_score(query_labels.cpu(), cluster_labels.cpu())
-
-    def requires_clustering(self):
-        return super().requires_clustering() + ["ari"]
-
 
 @torch.no_grad()
 def test_cluster(loader, model, accuracy_calculator, device):
     model.eval()
     ari = 0
-    pat1 = 0
+    # pat1 = 0
     for data in loader:
         mask = data.y.squeeze() != -1
         x = data.x.squeeze().to(device)
@@ -145,10 +139,10 @@ def test_cluster(loader, model, accuracy_calculator, device):
         acc = accuracy_calculator.get_accuracy(
             embeddings[mask], y[mask])
         ari += acc["ari"]
-        pat1 += acc["precision_at_1"]
+        # pat1 += acc["precision_at_1"]
 
     print(f"Test set ARI: {ari / len(loader)}")
-    print(f"Test set Precision@1: {pat1 / len(loader)}")
+    # print(f"Test set Precision@1: {pat1 / len(loader)}")
 
     return ari / len(loader)
 
@@ -166,16 +160,42 @@ mining_func = miners.TripletMarginMiner(
 # loss_func = losses.SupConLoss(embedding_regularizer=LpRegularizer())
 # mining_func = miners.BatchEasyHardMiner()
 
-cluster_function = FaissKMeans(
+
+cluster_function_faiss = FaissKMeans(
     niter=20, gpu=device == "cuda", min_points_per_centroid=10)
+
+
+def cluster_function_sklearn(embeddings, num_clusters):
+    try:
+        embeddings = embeddings.cpu().numpy()
+    except AttributeError:
+        pass
+    kmeans = KMeans(n_clusters=num_clusters, random_state=0).fit(
+        embeddings)
+    return kmeans.labels_
+
+
+class CustomAccuracyCalculator(AccuracyCalculator):
+    def calculate_ari(self, query_labels, cluster_labels, **kwargs):
+        try:
+            query_labels = query_labels.cpu().numpy()
+            cluster_labels = cluster_labels.cpu().numpy()
+        except AttributeError:
+            pass
+        return adjusted_rand_score(query_labels, cluster_labels)
+
+    def requires_clustering(self):
+        return super().requires_clustering() + ["ari"]
+
+
 accuracy_calculator = CustomAccuracyCalculator(
-    include=("precision_at_1", "ari"), k=1, kmeans_func=cluster_function)
+    include=("ari",), kmeans_func=cluster_function_sklearn)
 
 # %%
-num_epochs = 3
+num_epochs = 6
 for epoch in range(1, num_epochs + 1):
     loss_func = losses.TripletMarginLoss(
-        margin=0.2*epoch, distance=distance, reducer=reducer)
+        margin=0.1*epoch, distance=distance, reducer=reducer)
     train(model, loss_func, mining_func, device,
           train_loader, optimizer, epoch, scheduler)
     test_cluster(test_loader, model, accuracy_calculator, device)
