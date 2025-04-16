@@ -34,7 +34,7 @@ def scale_data(sample):
 
 
 ds = PhasePicksDataset(
-    root_dir='data/reference/all',
+    root_dir='data/reference/2s_20hz',
     stations_file='stations.csv',
     file_mask='arrivals_*.csv',
     catalog_mask='catalog_*.csv',
@@ -96,7 +96,8 @@ scheduler = torch.optim.lr_scheduler.StepLR(
 
 
 def train(model, loss_func, mining_func, device,
-          train_loader, optimizer, epoch, scheduler):
+          train_loader, optimizer, epoch,
+          scheduler: torch.optim.lr_scheduler.StepLR):
     model.train()
     for i, data in enumerate(train_loader):
         mask = data.y != -1
@@ -114,9 +115,10 @@ def train(model, loss_func, mining_func, device,
             num_triplets = mining_func.num_triplets if hasattr(
                 mining_func, "num_triplets") else None
             print("Epoch {} Iteration {}: Loss = {}, "
-                  "Number of mined triplets = {}".format(
-                      epoch, i, loss, num_triplets
-                  ))
+                  "Number of mined triplets = {}, "
+                  "Learning Rate = {}".format(
+                      epoch, i, loss, num_triplets,
+                      scheduler.get_last_lr()))
 
 
 # %% Testing Function
@@ -170,7 +172,7 @@ accuracy_calculator = CustomAccuracyCalculator(
     include=("precision_at_1", "ari"), k=1, kmeans_func=cluster_function)
 
 # %%
-num_epochs = 4
+num_epochs = 3
 for epoch in range(1, num_epochs + 1):
     loss_func = losses.TripletMarginLoss(
         margin=0.2*epoch, distance=distance, reducer=reducer)
