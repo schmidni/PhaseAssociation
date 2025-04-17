@@ -1,5 +1,6 @@
 # %%
-import matplotlib.pyplot as plt
+import itertools
+
 import torch
 from pytorch_metric_learning import distances, losses, miners, reducers  # noqa
 from pytorch_metric_learning.utils.accuracy_calculator import \
@@ -17,17 +18,14 @@ from torchvision import transforms
 
 from src.clustering.dataset import (NDArrayTransform, NDArrayTransformX,
                                     PhasePicksDataset)
+from src.plotting.embeddings import plot_embeddings_reduced
 
 # %% Load data
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-print(device)
+print(f'Running models on {device}.')
 
 
 def scale_data(sample):
-    # scaler_std = StandardScaler()
-    # return torch.tensor(scaler_std.fit_transform(sample),
-    #                     dtype=torch.float32,
-    #                     device=device)
     scaler = MinMaxScaler()
     return torch.tensor(scaler.fit_transform(sample),
                         dtype=torch.float32,
@@ -35,7 +33,7 @@ def scale_data(sample):
 
 
 ds = PhasePicksDataset(
-    root_dir='data/reference/5s_5hz',
+    root_dir='data/reference/2s_5hz',
     stations_file='stations.csv',
     file_mask='arrivals_*.csv',
     catalog_mask='catalog_*.csv',
@@ -94,8 +92,6 @@ scheduler = torch.optim.lr_scheduler.StepLR(
 
 
 # %%
-
-
 def train(model, loss_func, mining_func, device,
           train_loader, optimizer, epoch,
           scheduler: torch.optim.lr_scheduler.StepLR):
@@ -114,16 +110,15 @@ def train(model, loss_func, mining_func, device,
         scheduler.step()
         if i % 250 == 0:
             num_triplets = mining_func.num_triplets if hasattr(
-                mining_func, "num_triplets") else None
-            print("Epoch {} Iteration {}: Loss = {}, "
-                  "Number of mined triplets = {}, "
-                  "Learning Rate = {}".format(
+                mining_func, 'num_triplets') else None
+            print('Epoch {} Iteration {}: Loss = {}, '
+                  'Number of mined triplets = {}, '
+                  'Learning Rate = {}'.format(
                       epoch, i, loss, num_triplets,
                       scheduler.get_last_lr()))
 
 
 # %% Testing Function
-
 @torch.no_grad()
 def test_cluster(loader, model, accuracy_calculator, device):
     model.eval()
@@ -138,11 +133,11 @@ def test_cluster(loader, model, accuracy_calculator, device):
 
         acc = accuracy_calculator.get_accuracy(
             embeddings[mask], y[mask])
-        ari += acc["ari"]
-        # pat1 += acc["precision_at_1"]
+        ari += acc['ari']
+        # pat1 += acc['precision_at_1']
 
-    print(f"Test set ARI: {ari / len(loader)}")
-    # print(f"Test set Precision@1: {pat1 / len(loader)}")
+    print(f'Test set ARI: {ari / len(loader)}')
+    # print(f'Test set Precision@1: {pat1 / len(loader)}')
 
     return ari / len(loader)
 
@@ -154,7 +149,7 @@ reducer = reducers.AvgNonZeroReducer()
 loss_func = losses.TripletMarginLoss(
     margin=0.2, distance=distance, reducer=reducer)
 mining_func = miners.TripletMarginMiner(
-    margin=0.2, distance=distance, type_of_triplets="semihard")
+    margin=0.2, distance=distance, type_of_triplets='semihard')
 
 # loss_func = losses.NTXentLoss(embedding_regularizer=LpRegularizer())
 # loss_func = losses.SupConLoss(embedding_regularizer=LpRegularizer())
@@ -162,7 +157,7 @@ mining_func = miners.TripletMarginMiner(
 
 
 cluster_function_faiss = FaissKMeans(
-    niter=20, gpu=device == "cuda", min_points_per_centroid=10)
+    niter=20, gpu=device == 'cuda', min_points_per_centroid=10)
 
 
 def cluster_function_sklearn(embeddings, num_clusters):
@@ -185,13 +180,13 @@ class CustomAccuracyCalculator(AccuracyCalculator):
         return adjusted_rand_score(query_labels, cluster_labels)
 
     def requires_clustering(self):
-        return super().requires_clustering() + ["ari"]
+        return super().requires_clustering() + ['ari']
 
 
 accuracy_calculator = CustomAccuracyCalculator(
-    include=("ari",), kmeans_func=cluster_function_sklearn)
+    include=('ari',), kmeans_func=cluster_function_sklearn)
 
-# %%
+# %% TRAINING
 num_epochs = 6
 for epoch in range(1, num_epochs + 1):
     loss_func = losses.TripletMarginLoss(
@@ -199,19 +194,23 @@ for epoch in range(1, num_epochs + 1):
     train(model, loss_func, mining_func, device,
           train_loader, optimizer, epoch, scheduler)
     test_cluster(test_loader, model, accuracy_calculator, device)
+torch.save(model.state_dict(), 'model')
 
 # %%
 # scatter plot of embeddings
 
-data = next(iter(test_loader))
+model.load_state_dict(torch.load(
+    'model_2s_5hz', weights_only=True, map_location=torch.device('cpu')))
+
+
+# %%
+
+data = next(itertools.islice(test_loader, 10, None))
 x = data.x.squeeze().to(device)
 embeddings = model(x)
 embeddings = embeddings.cpu().squeeze().detach().numpy()
 labels = data.y.squeeze().cpu().numpy()
-plt.figure(figsize=(10, 10))
-plt.scatter(embeddings[:, 0], embeddings[:, 2], c=labels, s=1)
-plt.colorbar()
-plt.title('Embeddings')
-plt.xlabel('Embedding 1')
-plt.ylabel('Embedding 2')
-plt.show()
+
+plot_embeddings_reduced(embeddings, labels, data.catalog, method='tsne')
+
+# %%

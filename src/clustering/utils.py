@@ -1,9 +1,7 @@
 import itertools
 
-import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
-from scipy import linalg
 from sklearn.metrics import adjusted_rand_score as ARI
 from sklearn.metrics import pair_confusion_matrix as PCM
 
@@ -122,36 +120,3 @@ def plot_arrivals(arrivals, cat, cat_pred, labels, labels_pred):
                       arrivals.loc[labels == -1, 'dx'],
                       color='black', s=100)
     return (fig, ax)
-
-
-def plot_clusters(X, Y_, means, covariances, x, y, index, title):
-    splot = plt.subplot(2, 1, 1 + index)
-    for i, (mean, covar, color) in enumerate(
-            zip(means, covariances, color_iter)):
-        if covar.ndim < 2:
-            covar = np.diag(covar)
-        # use advanced indexing and broadcasting to select
-        # the rows and columns corresponding to x and y
-        covar = covar[np.ix_([x, y], [x, y])]
-        v, w = linalg.eigh(covar)
-        v = 2.0 * np.sqrt(2.0) * np.sqrt(v)
-        u = w[0] / linalg.norm(w[0])
-        # as the DP will not use every component it has access to
-        # unless it needs it, we shouldn't plot the redundant
-        # components.
-        if not np.any(Y_ == i):
-            continue
-        plt.scatter(X[Y_ == i, x], X[Y_ == i, y], 0.8, color=color)
-
-        # Plot an ellipse to show the Gaussian component
-        angle = np.arctan(u[1] / u[0])
-        angle = 180.0 * angle / np.pi  # convert to degrees
-        ell = mpl.patches.Ellipse(
-            (mean[x], mean[y]), v[0], v[1], angle=180.0 + angle, color=color)
-        ell.set_clip_box(splot.bbox)
-        ell.set_alpha(0.5)
-        splot.add_artist(ell)
-
-    plt.xticks(())
-    plt.yticks(())
-    plt.title(title)

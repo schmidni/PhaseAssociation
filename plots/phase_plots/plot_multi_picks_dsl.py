@@ -1,5 +1,6 @@
-from urllib.parse import urlparse
 import sys
+from urllib.parse import urlparse
+
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -15,8 +16,7 @@ from obspy.clients.fdsn import Client
 picks_df = pd.read_csv(
     '2024-04-30T040909-T040910_V__Sp0.15_Ss0.30.csv')
 station_coords_df = pd.read_csv('station_cords_blab_VALTER.csv')
-reference_df = pd.read_csv(
-    'sc_fdsn_cat_M0a.csv')
+reference_df = pd.read_csv('sc_fdsn_cat_M0a.csv')
 
 # Define thresholds for plotting
 p_threshold_low = 0
@@ -147,7 +147,7 @@ while custom_start_time < UTCDateTime("2024-04-30T04:09:10"):
     # Combo with time seris plot with waveform (optional)
     # Load waveform
     client = create_client(
-        "http://user:BedrettoLab2017!@bedretto-dev2.ethz.ch:8081")
+        "http://user:BedrettoLab2017!@bedretto-experiment.ethz.ch:8081")
     st = client.get_waveforms(
         "8R", "V0305", "*", "JDD", custom_start_time, custom_end_time)
     # Process waveform
