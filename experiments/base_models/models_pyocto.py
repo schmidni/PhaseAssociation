@@ -1,12 +1,14 @@
 # %% Imports and Configuration
-import pandas as pd
+# import pandas as pd
 import pyocto
+import torch
 import tqdm
+from torch.utils.data import random_split
 
 from src.clustering.dataset import (GaMMAPickFormat, GaMMAStationFormat,
                                     PhasePicksDataset)
 from src.clustering.models import run_pyocto
-from src.clustering.utils import ClusterStatistics, plot_arrivals
+from src.clustering.utils import ClusterStatistics  # , plot_arrivals
 
 velocity_model = pyocto.VelocityModel0D(
     p_velocity=5.5,
@@ -53,15 +55,18 @@ associator = pyocto.OctoAssociator(
 statistics = ClusterStatistics()
 
 ds = PhasePicksDataset(
-    root_dir='data/raw',
+    root_dir='../../data/reference/low_freq',
     stations_file='stations.csv',
     file_mask='arrivals_*.csv',
     catalog_mask='catalog_*.csv',
     transform=GaMMAPickFormat(),
     station_transform=GaMMAStationFormat()
 )
+generator = torch.Generator().manual_seed(25)
+test_dataset, _ = random_split(
+    ds, [0.01, 0.99], generator=generator)
 
-for sample in tqdm.tqdm(ds):
+for sample in tqdm.tqdm(test_dataset):
     events, labels_pred = run_pyocto(sample.x, ds.stations, associator)
 
     statistics.add(sample.y.to_numpy(),
@@ -75,15 +80,15 @@ print(f"PyOcto event precision: {statistics.event_precision()}, "
       f"PyOcto event recall: {statistics.event_recall()}")
 
 # %% Plot Results
-associations = sample.x.copy().join(ds.stations.set_index('id'), on='id')
-associations['dx'] = PhasePicksDataset.get_distance(
-    associations, ['x(km)', 'y(km)', 'z(km)'])*1000
-associations['time'] = pd.to_datetime(
-    associations['timestamp'], unit='ns').values.astype(int)
+# associations = sample.x.copy().join(ds.stations.set_index('id'), on='id')
+# associations['dx'] = PhasePicksDataset.get_distance(
+#     associations, ['x(km)', 'y(km)', 'z(km)'])*1000
+# associations['time'] = pd.to_datetime(
+#     associations['timestamp'], unit='ns').values.astype(int)
 
-plot_arrivals(associations[['dx', 'time']],
-              sample.catalog[['dx', 'time']],
-              events[['dx', 'time']],
-              sample.y.to_numpy(), labels_pred)
+# plot_arrivals(associations[['dx', 'time']],
+#               sample.catalog[['dx', 'time']],
+#               events[['dx', 'time']],
+#               sample.y.to_numpy(), labels_pred)
 
 # %%

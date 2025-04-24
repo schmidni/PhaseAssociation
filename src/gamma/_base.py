@@ -14,7 +14,7 @@ from sklearn import cluster
 from sklearn.base import BaseEstimator, DensityMixin
 from sklearn.exceptions import ConvergenceWarning
 from sklearn.utils import check_array, check_random_state
-from sklearn.utils.validation import check_is_fitted
+from sklearn.utils.validation import _check_n_features, check_is_fitted
 
 from .seismic_ops import initialize_centers
 
@@ -231,7 +231,7 @@ class BaseMixture(DensityMixin, BaseEstimator, metaclass=ABCMeta):
             Component labels.
         """
         X = _check_X(X, self.n_components, ensure_min_samples=2)
-        self._check_n_features(X, reset=True)
+        _check_n_features(self, X, reset=True)
         self._check_initial_parameters(X)
 
         # if we enable warm_start, we will have a unique initialisation

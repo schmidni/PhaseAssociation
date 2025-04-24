@@ -1,15 +1,14 @@
 # %%
 import itertools
+from datetime import datetime
 
 import torch
-from pytorch_metric_learning import distances, losses, miners, reducers  # noqa
+from pytorch_metric_learning import distances, losses, miners, reducers
 from pytorch_metric_learning.utils.accuracy_calculator import \
     AccuracyCalculator
-from pytorch_metric_learning.utils.inference import FaissKMeans
 from sklearn.cluster import KMeans
-# from pytorch_metric_learning.regularizers import LpRegularizer
 from sklearn.metrics import adjusted_rand_score
-from sklearn.preprocessing import MinMaxScaler  # , StandardScaler
+from sklearn.preprocessing import MinMaxScaler
 from torch import nn
 from torch.nn import functional as F
 from torch.utils.data import random_split
@@ -17,7 +16,7 @@ from torch_geometric.loader import DataLoader
 from torchvision import transforms
 
 from src.clustering.dataset import (NDArrayTransform, NDArrayTransformX,
-                                    PhasePicksDataset)
+                                    PhasePicksDataset, ReduceDatetime)
 from src.plotting.embeddings import plot_embeddings_reduced
 
 # %% Load data
@@ -33,14 +32,15 @@ def scale_data(sample):
 
 
 ds = PhasePicksDataset(
-    root_dir='data/reference/2s_5hz',
+    root_dir='data/reference/low_freq',
     stations_file='stations.csv',
     file_mask='arrivals_*.csv',
     catalog_mask='catalog_*.csv',
     transform=transforms.Compose([
+        ReduceDatetime(datetime=datetime(2025, 1, 1, 0, 0, 0)),
         NDArrayTransformX(drop_cols=['station'],
                           cat_cols=['phase']),
-        scale_data
+        scale_data,
     ]),
     target_transform=NDArrayTransform(),
     catalog_transform=NDArrayTransform(),
@@ -53,14 +53,15 @@ ds = PhasePicksDataset(
 
 generator = torch.Generator().manual_seed(42)
 train_dataset, test_dataset, _ = random_split(
-    ds, [0.9, 0.09, 0.01], generator=generator)
+    ds, [0.89, 0.1, 0.01], generator=generator)
 
 test_loader = DataLoader(test_dataset, batch_size=1, num_workers=0)
 train_loader = DataLoader(train_dataset, batch_size=1, num_workers=0)
 
 print('Data Loader Prepared')
 
-# %%
+# %% DEFINITIONS
+###############################################################################
 
 
 class NN(torch.nn.Module):
@@ -84,14 +85,6 @@ class NN(torch.nn.Module):
         return F.normalize(logits, p=2, dim=1)
 
 
-n_features = ds[0].x.shape[1]
-model = NN(n_features, 64, 16).to(device)
-optimizer = torch.optim.Adam(model.parameters(), lr=1e-2)
-scheduler = torch.optim.lr_scheduler.StepLR(
-    optimizer, step_size=1000, gamma=0.9)
-
-
-# %%
 def train(model, loss_func, mining_func, device,
           train_loader, optimizer, epoch,
           scheduler: torch.optim.lr_scheduler.StepLR):
@@ -118,12 +111,11 @@ def train(model, loss_func, mining_func, device,
                       scheduler.get_last_lr()))
 
 
-# %% Testing Function
 @torch.no_grad()
 def test_cluster(loader, model, accuracy_calculator, device):
     model.eval()
     ari = 0
-    # pat1 = 0
+
     for data in loader:
         mask = data.y.squeeze() != -1
         x = data.x.squeeze().to(device)
@@ -134,33 +126,14 @@ def test_cluster(loader, model, accuracy_calculator, device):
         acc = accuracy_calculator.get_accuracy(
             embeddings[mask], y[mask])
         ari += acc['ari']
-        # pat1 += acc['precision_at_1']
 
     print(f'Test set ARI: {ari / len(loader)}')
-    # print(f'Test set Precision@1: {pat1 / len(loader)}')
 
     return ari / len(loader)
 
 
-# %% pytorch-metric-learning stuff
-distance = distances.CosineSimilarity()
-# reducer = reducers.ThresholdReducer(low=0)
-reducer = reducers.AvgNonZeroReducer()
-loss_func = losses.TripletMarginLoss(
-    margin=0.2, distance=distance, reducer=reducer)
-mining_func = miners.TripletMarginMiner(
-    margin=0.2, distance=distance, type_of_triplets='semihard')
-
-# loss_func = losses.NTXentLoss(embedding_regularizer=LpRegularizer())
-# loss_func = losses.SupConLoss(embedding_regularizer=LpRegularizer())
-# mining_func = miners.BatchEasyHardMiner()
-
-
-cluster_function_faiss = FaissKMeans(
-    niter=20, gpu=device == 'cuda', min_points_per_centroid=10)
-
-
 def cluster_function_sklearn(embeddings, num_clusters):
+    # clustering function for testing
     try:
         embeddings = embeddings.cpu().numpy()
     except AttributeError:
@@ -171,6 +144,7 @@ def cluster_function_sklearn(embeddings, num_clusters):
 
 
 class CustomAccuracyCalculator(AccuracyCalculator):
+    # custom accuracy calculator
     def calculate_ari(self, query_labels, cluster_labels, **kwargs):
         try:
             query_labels = query_labels.cpu().numpy()
@@ -183,10 +157,25 @@ class CustomAccuracyCalculator(AccuracyCalculator):
         return super().requires_clustering() + ['ari']
 
 
+# %% INSTANTIATIONS
+###############################################################################
+distance = distances.CosineSimilarity()
+reducer = reducers.AvgNonZeroReducer()
+loss_func = losses.TripletMarginLoss(
+    margin=0.2, distance=distance, reducer=reducer)
+mining_func = miners.TripletMarginMiner(
+    margin=0.2, distance=distance, type_of_triplets='semihard')
+
 accuracy_calculator = CustomAccuracyCalculator(
     include=('ari',), kmeans_func=cluster_function_sklearn)
+model = NN(ds[0].x.shape[1], 64, 16).to(device)
+optimizer = torch.optim.Adam(model.parameters(), lr=1e-2)
+scheduler = torch.optim.lr_scheduler.StepLR(
+    optimizer, step_size=1000, gamma=0.9)
+
 
 # %% TRAINING
+###############################################################################
 num_epochs = 6
 for epoch in range(1, num_epochs + 1):
     loss_func = losses.TripletMarginLoss(
@@ -196,21 +185,19 @@ for epoch in range(1, num_epochs + 1):
     test_cluster(test_loader, model, accuracy_calculator, device)
 torch.save(model.state_dict(), 'model')
 
-# %%
-# scatter plot of embeddings
-
+# %% VALIDATION
+###############################################################################
 model.load_state_dict(torch.load(
     'model_2s_5hz', weights_only=True, map_location=torch.device('cpu')))
+test_cluster(test_loader, model, accuracy_calculator, device)
 
 
-# %%
-
-data = next(itertools.islice(test_loader, 10, None))
+# %% VISUALIZATION
+###############################################################################
+data = next(itertools.islice(test_loader, 44, None))
 x = data.x.squeeze().to(device)
 embeddings = model(x)
 embeddings = embeddings.cpu().squeeze().detach().numpy()
 labels = data.y.squeeze().cpu().numpy()
 
 plot_embeddings_reduced(embeddings, labels, data.catalog, method='tsne')
-
-# %%

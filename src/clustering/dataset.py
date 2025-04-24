@@ -146,3 +146,14 @@ class NDArrayTransform:
         return torch.tensor(sample.to_numpy(),
                             dtype=torch.float64,
                             device=self.device)
+
+
+class ReduceDatetime:
+    def __init__(self, datetime, device=None):
+        self.device = device
+        self.datetime = datetime
+
+    def __call__(self, sample):
+        sample['time'] = sample['time'] - \
+            pd.to_datetime(self.datetime, unit='ns').value
+        return sample
