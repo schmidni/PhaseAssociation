@@ -134,7 +134,7 @@ class NDArrayTransformX:
         for col in self.cat_cols:
             sample[col] = sample[col].astype('category').cat.codes
         return torch.tensor(sample.to_numpy(),
-                            dtype=torch.float64,
+                            dtype=torch.float32,
                             device=self.device)
 
 
@@ -144,7 +144,7 @@ class NDArrayTransform:
 
     def __call__(self, sample):
         return torch.tensor(sample.to_numpy(),
-                            dtype=torch.float64,
+                            dtype=torch.float32,
                             device=self.device)
 
 

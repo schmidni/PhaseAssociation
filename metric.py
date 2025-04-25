@@ -16,7 +16,7 @@ from torch.utils.data import DataLoader, random_split
 from torchvision import transforms
 
 from src.clustering.dataset import (NDArrayTransform, NDArrayTransformX,
-                                    PhasePicksDataset, ReduceDatetime)
+                                    PhasePicksDataset, Picks, ReduceDatetime)
 from src.plotting.embeddings import plot_embeddings_reduced
 
 # %% Load data
@@ -26,7 +26,16 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 print(f'Running models on {device}.')
 
 
-def collate_fn(batch):
+def collate_fn(batch: list[Picks]) -> tuple[torch.Tensor, torch.Tensor]:
+    """
+    Custom collate function to pad sequences in a batch.
+
+    Args:
+        batch: List of Picks objects.
+
+    Returns:
+        Tuple of padded x and y tensors.
+    """
     xs = [item.x for item in batch]
     ys = [item.y for item in batch]
 
@@ -36,10 +45,10 @@ def collate_fn(batch):
     padded_ys = pad_sequence(ys, batch_first=True,
                              padding_value=-2)
 
-    return padded_xs, padded_ys
+    return padded_xs.to(dtype=torch.float32), padded_ys.to(dtype=torch.long)
 
 
-def scale_data(sample):
+def scale_data(sample: torch.Tensor) -> torch.Tensor:
     scaler = MinMaxScaler()
     return torch.tensor(scaler.fit_transform(sample))
 
@@ -63,13 +72,14 @@ ds = PhasePicksDataset(
 # number of catalogs: len(ds)
 # number of picks per catalog: ds[0].x.shape[0]
 # number of events per catalog: len(np.unique(ds[0].y)) - 1
+# stations: ds.stations
+# catalog: ds[0].catalog
 
-generator = torch.Generator().manual_seed(42)
+generator = torch.Generator()  # .manual_seed(42)
 train_dataset, test_dataset, _ = random_split(
     ds, [0.02, 0.01, 0.97], generator=generator)
 
-test_loader = DataLoader(test_dataset, batch_size=4,
-                         num_workers=0, shuffle=True, collate_fn=collate_fn)
+test_loader = DataLoader(test_dataset, batch_size=1, collate_fn=collate_fn)
 train_loader = DataLoader(train_dataset, batch_size=4,
                           num_workers=0, shuffle=True, collate_fn=collate_fn)
 
@@ -80,12 +90,12 @@ print('Data Loader Prepared')
 
 class PhasePickTransformer(nn.Module):
     def __init__(self,
-                 input_dim,
-                 embed_dim=128,
-                 num_heads=4,
-                 num_layers=2,
-                 output_dim=16,
-                 max_picks=100):
+                 input_dim: int,
+                 embed_dim: int = 128,
+                 num_heads: int = 4,
+                 num_layers: int = 2,
+                 output_dim: int = 16,
+                 max_picks: int = 100):
         super(PhasePickTransformer, self).__init__()
         self.embed_dim = embed_dim  # Transformer embedding dimension
         self.output_dim = output_dim  # Final embedding dimension
@@ -113,7 +123,9 @@ class PhasePickTransformer(nn.Module):
         # L2 normalization
         self.normalize = nn.functional.normalize
 
-    def forward(self, pick_features, pick_times):
+    def forward(self,
+                pick_features: torch.tensor,
+                pick_times: torch.tensor) -> torch.tensor:
         """
         pick_features: Tensor (batch, N, feature_dim)
         pick_times: Tensor (batch, N) — used for sorting
@@ -142,8 +154,8 @@ class PhasePickTransformer(nn.Module):
         inv_idx = torch.argsort(sorted_idx, dim=1)
         x = x[batch_indices, inv_idx]
 
-        # Project to 16D embedding
-        x = self.output_proj(x)  # (batch, N, 16)
+        # Project to output embedding
+        x = self.output_proj(x)  # (batch, N, output_dim)
 
         # Normalize
         emb = self.normalize(x, p=2, dim=-1)
@@ -181,18 +193,32 @@ class PhasePickMLP(torch.nn.Module):
         return x
 
 
+def remap_noise_labels(labels):
+    labels = labels.clone()  # avoid modifying in-place
+    max_label = labels[labels != -
+                       1].max().item() if (labels != -1).any() else -1
+    next_label = max_label + 1
+
+    noise_mask = (labels == -1)
+    num_noise = noise_mask.sum().item()
+
+    # Assign each -1 a unique ID
+    labels[noise_mask] = torch.arange(
+        next_label, next_label + num_noise, device=labels.device)
+
+    return labels
+
+
 def train(model, loss_func, mining_func, device,
           train_loader, optimizer, epoch,
           scheduler: torch.optim.lr_scheduler.StepLR):
     model.train()
-    for i, data in enumerate(train_loader):
-        mask = data.y.squeeze() != -1
-
+    for i, (x, y) in enumerate(train_loader):
         # (batch, picks, feat)
-        x = data.x[:, mask, :].to(device)
+        x = x.to(device)
         pick_times = x[..., 0]
         # (batch, picks)
-        y = data.y[:, mask].to(device).long()
+        y = y.to(device)
 
         optimizer.zero_grad()
 
@@ -203,8 +229,16 @@ def train(model, loss_func, mining_func, device,
         flat_embeddings = embeddings.view(-1, embeddings.size(-1))
         flat_labels = y.view(-1)
 
-        indices_tuple = mining_func(flat_embeddings, flat_labels)
-        loss = loss_func(flat_embeddings, flat_labels, indices_tuple)
+        # Mask out padding
+        valid_mask = flat_labels != -2
+        flat_embeddings = flat_embeddings[valid_mask]
+        flat_labels = flat_labels[valid_mask]
+
+        # Remap noise labels to unique IDs
+        remapped_labels = remap_noise_labels(flat_labels)
+
+        indices_tuple = mining_func(flat_embeddings, remapped_labels)
+        loss = loss_func(flat_embeddings, remapped_labels, indices_tuple)
         loss.backward()
         optimizer.step()
         scheduler.step()
@@ -222,19 +256,20 @@ def test_cluster(loader, model, accuracy_calculator, device):
     model.eval()
     ari = 0
 
-    for data in loader:
-        mask = data.y.squeeze() != -1
+    for x, y in loader:
+        x = x.to(device)
+        y = y.to(device)
 
-        # (batch, picks, feat)
-        x = data.x[:, mask, :].to(device)
         pick_times = x[..., 0]
-        # (batch, picks)
-        y = data.y[:, mask].to(device).long()
 
-        # (batch, picks, out_feats)
         embeddings = model(x, pick_times)
         flat_embeddings = embeddings.view(-1, embeddings.size(-1))
         flat_labels = y.view(-1)
+
+        # Mask out padding (-2) and noise (-1)
+        valid_mask = (flat_labels != -2) & (flat_labels != -1)
+        flat_embeddings = flat_embeddings[valid_mask]
+        flat_labels = flat_labels[valid_mask]
 
         acc = accuracy_calculator.get_accuracy(flat_embeddings, flat_labels)
         ari += acc['ari']
@@ -270,7 +305,6 @@ class CustomAccuracyCalculator(AccuracyCalculator):
 
 # %% INSTANTIATIONS
 ###############################################################################
-
 # ## Metric Learning
 distance = distances.CosineSimilarity()
 reducer = reducers.AvgNonZeroReducer()
