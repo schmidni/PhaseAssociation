@@ -11,8 +11,8 @@ from sklearn.metrics import adjusted_rand_score
 from sklearn.preprocessing import MinMaxScaler
 from torch import nn
 from torch.nn import functional as F
-from torch.utils.data import random_split
-from torch_geometric.loader import DataLoader
+from torch.nn.utils.rnn import pad_sequence
+from torch.utils.data import DataLoader, random_split
 from torchvision import transforms
 
 from src.clustering.dataset import (NDArrayTransform, NDArrayTransformX,
@@ -20,15 +20,28 @@ from src.clustering.dataset import (NDArrayTransform, NDArrayTransformX,
 from src.plotting.embeddings import plot_embeddings_reduced
 
 # %% Load data
+
+
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 print(f'Running models on {device}.')
 
 
+def collate_fn(batch):
+    xs = [item.x for item in batch]
+    ys = [item.y for item in batch]
+
+    # (batch, max_picks, feature_dim)
+    padded_xs = pad_sequence(xs, batch_first=True)
+    # (batch, max_picks)
+    padded_ys = pad_sequence(ys, batch_first=True,
+                             padding_value=-2)
+
+    return padded_xs, padded_ys
+
+
 def scale_data(sample):
     scaler = MinMaxScaler()
-    return torch.tensor(scaler.fit_transform(sample),
-                        dtype=torch.float32,
-                        device=device)
+    return torch.tensor(scaler.fit_transform(sample))
 
 
 ds = PhasePicksDataset(
@@ -47,7 +60,7 @@ ds = PhasePicksDataset(
 )
 
 # number of features: ds[0].x.shape[1]
-# number of catalogs: len(ds) = 5000
+# number of catalogs: len(ds)
 # number of picks per catalog: ds[0].x.shape[0]
 # number of events per catalog: len(np.unique(ds[0].y)) - 1
 
@@ -55,25 +68,27 @@ generator = torch.Generator().manual_seed(42)
 train_dataset, test_dataset, _ = random_split(
     ds, [0.02, 0.01, 0.97], generator=generator)
 
-test_loader = DataLoader(test_dataset, batch_size=1, num_workers=0)
-train_loader = DataLoader(train_dataset, batch_size=1, num_workers=0)
+test_loader = DataLoader(test_dataset, batch_size=4,
+                         num_workers=0, shuffle=True, collate_fn=collate_fn)
+train_loader = DataLoader(train_dataset, batch_size=4,
+                          num_workers=0, shuffle=True, collate_fn=collate_fn)
 
 print('Data Loader Prepared')
-
 # %% DEFINITIONS
 ###############################################################################
 
 
-class PickSetTransformer(nn.Module):
+class PhasePickTransformer(nn.Module):
     def __init__(self,
                  input_dim,
                  embed_dim=128,
                  num_heads=4,
                  num_layers=2,
+                 output_dim=16,
                  max_picks=100):
-        super(PickSetTransformer, self).__init__()
-        self.embed_dim = embed_dim
-        self.output_dim = 16  # Final embedding dimension
+        super(PhasePickTransformer, self).__init__()
+        self.embed_dim = embed_dim  # Transformer embedding dimension
+        self.output_dim = output_dim  # Final embedding dimension
 
         # Project input features to Transformer embedding dim
         self.feature_proj = nn.Linear(input_dim, embed_dim)
@@ -88,7 +103,7 @@ class PickSetTransformer(nn.Module):
         self.transformer = nn.TransformerEncoder(
             encoder_layer, num_layers=num_layers)
 
-        # MLP projection head to 16D embedding
+        # MLP projection head to output dimension
         self.output_proj = nn.Sequential(
             nn.Linear(embed_dim, 64),
             nn.ReLU(),
@@ -135,23 +150,7 @@ class PickSetTransformer(nn.Module):
         return emb
 
 
-# %%
-# # Example usage:
-# batch_size = 4
-# max_picks = 50
-# feature_dim = ds[0].x.shape[1]
-# model = PickSetTransformer(input_dim=feature_dim, max_picks=1000)
-# # Dummy input
-# # pick_feats = torch.randn(batch_size, max_picks, feature_dim)
-# pick_times = pick_feats[..., 0]  # assuming last feature is pick_time
-# # output shape: (batch, max_picks, embed_dim)
-# embeddings = model(pick_feats, pick_times)
-# print(embeddings.shape)  # (4, 50, 128) for this example
-
-# %% MODEL
-
-
-class NN(torch.nn.Module):
+class PhasePickMLP(torch.nn.Module):
     def __init__(self, in_feats, h_feats, out_feats):
         super().__init__()
         self.linear_relu_stack = nn.Sequential(
@@ -191,7 +190,6 @@ def train(model, loss_func, mining_func, device,
 
         # (batch, picks, feat)
         x = data.x[:, mask, :].to(device)
-        # assuming first feature is pick_time
         pick_times = x[..., 0]
         # (batch, picks)
         y = data.y[:, mask].to(device).long()
@@ -227,11 +225,14 @@ def test_cluster(loader, model, accuracy_calculator, device):
     for data in loader:
         mask = data.y.squeeze() != -1
 
-        # (batch, picks, feature_dim)
+        # (batch, picks, feat)
         x = data.x[:, mask, :].to(device)
-        y = data.y[:, mask].to(device).long()    # (batch, picks)
+        pick_times = x[..., 0]
+        # (batch, picks)
+        y = data.y[:, mask].to(device).long()
 
-        embeddings = model(x)                 # (batch, picks, out_feats)
+        # (batch, picks, out_feats)
+        embeddings = model(x, pick_times)
         flat_embeddings = embeddings.view(-1, embeddings.size(-1))
         flat_labels = y.view(-1)
 
@@ -269,48 +270,59 @@ class CustomAccuracyCalculator(AccuracyCalculator):
 
 # %% INSTANTIATIONS
 ###############################################################################
+
+# ## Metric Learning
 distance = distances.CosineSimilarity()
 reducer = reducers.AvgNonZeroReducer()
-mining_func = miners.TripletMarginMiner(
-    margin=0.2, distance=distance, type_of_triplets='semihard')
 
+# ## Testing Performance
 accuracy_calculator = CustomAccuracyCalculator(
     include=('ari',), kmeans_func=cluster_function_sklearn)
-model = NN(ds[0].x.shape[1], 64, 16).to(device)
 
+# ## Model
+# model = NN(ds[0].x.shape[1], 64, 16).to(device)
+model = PhasePickTransformer(
+    input_dim=ds[0].x.shape[1], embed_dim=128, num_heads=4,
+    num_layers=2, max_picks=1000).to(device)
 
-# optimizer = torch.optim.Adam(model.parameters(), lr=1e-2)
-# scheduler = torch.optim.lr_scheduler.StepLR(
-#     optimizer, step_size=1000, gamma=0.9)
-
-
-# AdamW optimizer with initial LR (max LR will be set by scheduler)
-optimizer = torch.optim.AdamW(model.parameters(), lr=1e-3)
-
+# ## Epochs
 num_epochs = 10
 steps_per_epoch = len(train_loader)
 total_steps = num_epochs * steps_per_epoch
 
-# OneCycleLR scheduler: adjust max_lr and pct_start as needed
-scheduler = torch.optim.lr_scheduler.OneCycleLR(
-    optimizer, max_lr=1e-3, total_steps=total_steps, pct_start=0.3,
-    anneal_strategy='cos', final_div_factor=30
-)
+
+# ## Scheduler and Optimizer
+# AdamW optimizer with initial LR (max LR will be set by scheduler)
+optimizer = torch.optim.AdamW(model.parameters(), lr=1e-3)
 # This will start at max_lr/div_factor (default
 # div_factor=25 if not provided, here final_div_factor=30 for end LR)
 # and peak at 1e-3 around 30% of training, then cosine anneal down to
 # max_lr/final_div_factor.
+scheduler = torch.optim.lr_scheduler.OneCycleLR(
+    optimizer, max_lr=1e-3, total_steps=total_steps, pct_start=0.3,
+    anneal_strategy='cos', final_div_factor=30
+)
+# optimizer = torch.optim.Adam(model.parameters(), lr=1e-2)
+# scheduler = torch.optim.lr_scheduler.StepLR(
+#     optimizer, step_size=total_steps/20, gamma=0.9)
 
 
 # %% TRAINING
 ###############################################################################
 for epoch in range(1, num_epochs + 1):
+    margin = 0.2 + (epoch * 0.4/num_epochs)
+
+    mining_func = miners.TripletMarginMiner(
+        margin=margin, distance=distance, type_of_triplets='semihard')
     loss_func = losses.TripletMarginLoss(
-        margin=0.2+epoch*0.04, distance=distance, reducer=reducer)
+        margin=margin, distance=distance, reducer=reducer)
+
     train(model, loss_func, mining_func, device,
           train_loader, optimizer, epoch, scheduler)
     test_cluster(test_loader, model, accuracy_calculator, device)
-torch.save(model.state_dict(), 'model')
+
+    torch.save(model.state_dict(), 'model')
+
 
 # %% VALIDATION
 ###############################################################################

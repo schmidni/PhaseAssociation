@@ -8,7 +8,7 @@ import torch
 from sklearn.cluster import KMeans
 from sklearn.preprocessing import StandardScaler
 from torch import nn
-from torch_geometric.loader import DataLoader
+from torch.utils.data import DataLoader
 from torchvision import transforms
 
 from create_synthetic_data import create_synthetic_data

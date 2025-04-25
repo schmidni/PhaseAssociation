@@ -13,8 +13,7 @@ from sklearn.cluster import KMeans
 from sklearn.metrics import adjusted_rand_score
 from sklearn.preprocessing import StandardScaler
 from torch import nn
-from torch.utils.data import random_split
-from torch_geometric.loader import DataLoader
+from torch.utils.data import DataLoader, random_split
 from torchvision import transforms
 
 from src.clustering.dataset import (NDArrayTransform, NDArrayTransformX,
