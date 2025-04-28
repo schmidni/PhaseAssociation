@@ -2,19 +2,38 @@ import glob
 import os
 from collections import namedtuple
 
-import numpy as np
 import pandas as pd
-import torch
+from sklearn.preprocessing import MinMaxScaler
 from torch.utils.data import Dataset
 
 Picks = namedtuple('Picks', ['x', 'y', 'catalog'])
+
+
+def parse_synthetic_picks(picks: pd.DataFrame, stations: pd.DataFrame):
+
+    picks['time'] = pd.to_datetime(picks['time'], unit='ns').values.astype(int)
+    picks = picks.join(stations.set_index('id'), on='station')
+    picks = picks.drop(columns=['longitude', 'latitude', 'altitude'])
+    picks = picks.sort_values(by='time')
+
+    station_index_mapping = pd.Series(stations.index, index=stations['id'])
+    picks['station_id'] = picks['station'].map(station_index_mapping)
+
+    if 'event' in picks.columns:
+        labels = picks['event']
+        picks = picks.drop(columns=['event'])
+    else:
+        labels = None
+
+    return picks, labels
 
 
 class PhasePicksDataset(Dataset):
     def __init__(self,
                  root_dir,
                  stations_file,
-                 file_mask='arrivals_*.csv',
+                 file_mask,
+                 input_fn=parse_synthetic_picks,
                  catalog_mask=None,
                  transform=None,
                  target_transform=None,
@@ -22,19 +41,21 @@ class PhasePicksDataset(Dataset):
                  catalog_transform=None):
 
         self.root_dir = root_dir
-        self.transform = transform
-        self.target_transform = target_transform
-        self.station_transform = station_transform
-        self.catalog_transform = catalog_transform
-        self.catalog_files = None
-
         self._stations = pd.read_csv(
             os.path.join(self.root_dir, stations_file))
         self.files = sorted(glob.glob(os.path.join(self.root_dir, file_mask)))
 
+        self.input_fn = input_fn
+
+        self.catalog_files = None
         if catalog_mask:
             self.catalog_files = sorted(glob.glob(
                 os.path.join(self.root_dir, catalog_mask)))
+
+        self.transform = transform
+        self.target_transform = target_transform
+        self.station_transform = station_transform
+        self.catalog_transform = catalog_transform
 
     # getter for self._stations
     @property
@@ -47,47 +68,31 @@ class PhasePicksDataset(Dataset):
         return len(self.files)
 
     def __getitem__(self, idx):
-
         file = self.files[idx]
-        sample = pd.read_csv(file)
-        sample = self.convert_datetime(sample)
-        sample = sample.join(self._stations.set_index('id'), on='station')
-        sample = sample.drop(columns=['longitude', 'latitude', 'altitude'])
 
-        if 'event' in sample.columns:
-            events = sample['event']
-            sample = sample.drop(columns=['event'])
-        else:
-            events = None
+        samples = pd.read_csv(file)
+        samples, labels = self.input_fn(samples, self.stations)
 
+        catalog = None
         if self.catalog_files:
             catalog = pd.read_csv(self.catalog_files[idx], index_col=0)
             catalog = self.convert_datetime(catalog)
-            catalog['dx'] = self.get_distance(catalog)
-        else:
-            catalog = None
 
         if self.transform:
-            sample = self.transform(sample)
+            samples = self.transform(samples)
 
         if self.target_transform:
-            events = self.target_transform(events)
+            labels = self.target_transform(labels)
 
         if self.catalog_transform:
             catalog = self.catalog_transform(catalog)
 
-        return Picks(x=sample, y=events, catalog=catalog)
+        return Picks(x=samples, y=labels, catalog=catalog)
 
     @staticmethod
     def convert_datetime(df):
         df['time'] = pd.to_datetime(df['time'], unit='ns').values.astype(int)
         return df
-
-    @staticmethod
-    def get_distance(df, cols=['e', 'n', 'u'], reference=(0, 0, 0)):
-        return np.sqrt((df[cols[0]] - reference[0])**2 +
-                       (df[cols[1]] - reference[1])**2 +
-                       (df[cols[2]] - reference[2])**2)
 
 
 class GaMMAPickFormat:
@@ -120,40 +125,47 @@ class GaMMAStationFormat:
         return stn
 
 
-class NDArrayTransformX:
-    def __init__(self,
-                 device=None,
-                 drop_cols=[],
-                 cat_cols=[]):
+class ColumnsTransform:
+    def __init__(self, drop_cols=[], cat_cols=[]):
         self.drop_cols = drop_cols
         self.cat_cols = cat_cols
-        self.device = device
 
     def __call__(self, sample):
-        sample = sample.drop(columns=self.drop_cols)
+        for col in self.drop_cols:
+            sample = sample.drop(columns=col)
         for col in self.cat_cols:
             sample[col] = sample[col].astype('category').cat.codes
-        return torch.tensor(sample.to_numpy(),
-                            dtype=torch.float32,
-                            device=self.device)
-
-
-class NDArrayTransform:
-    def __init__(self, device=None):
-        self.device = device
-
-    def __call__(self, sample):
-        return torch.tensor(sample.to_numpy(),
-                            dtype=torch.float32,
-                            device=self.device)
+        return sample
 
 
 class ReduceDatetime:
-    def __init__(self, datetime, device=None):
-        self.device = device
-        self.datetime = datetime
+    def __init__(self, column='time'):
+        self.column = column
 
     def __call__(self, sample):
-        sample['time'] = sample['time'] - \
-            pd.to_datetime(self.datetime, unit='ns').value
+        sample[self.column] = sample[self.column] - \
+            pd.to_datetime(sample[self.column].min(), unit='ns').value
+        return sample
+
+
+class SortDatetime:
+    def __init__(self):
+        pass
+
+    def __call__(self, sample: pd.DataFrame, label: pd.Series | None = None):
+        print(sample)
+        # sort sample and label by time
+        sample = sample.sort_values(by='time')
+        label = label.reindex(sample.index)
+        print(sample)
+        return (sample, label) if label is not None else sample
+
+
+class ScaleTransform:
+    def __init__(self, columns=[]):
+        self.columns = columns
+        self.scaler = MinMaxScaler()
+
+    def __call__(self, sample: pd.DataFrame) -> pd.DataFrame:
+        sample[self.columns] = self.scaler.fit_transform(sample[self.columns])
         return sample
