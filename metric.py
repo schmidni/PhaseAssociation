@@ -1,6 +1,5 @@
 # %%
 import itertools
-from datetime import datetime
 
 import torch
 from pytorch_metric_learning import distances, losses, miners, reducers
@@ -8,15 +7,14 @@ from pytorch_metric_learning.utils.accuracy_calculator import \
     AccuracyCalculator
 from sklearn.cluster import KMeans
 from sklearn.metrics import adjusted_rand_score
-from sklearn.preprocessing import MinMaxScaler
 from torch import nn
 from torch.nn import functional as F
 from torch.nn.utils.rnn import pad_sequence
 from torch.utils.data import DataLoader, random_split
 from torchvision import transforms
 
-from src.clustering.dataset import (NDArrayTransform, NDArrayTransformX,
-                                    PhasePicksDataset, Picks, ReduceDatetime)
+from src.clustering.dataset import (ColumnsTransform, PhasePicksDataset, Picks,
+                                    ReduceDatetime, ScaleTransform)
 from src.plotting.embeddings import plot_embeddings_reduced
 
 # %% Load data
@@ -26,7 +24,8 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 print(f'Running models on {device}.')
 
 
-def collate_fn(batch: list[Picks]) -> tuple[torch.Tensor, torch.Tensor]:
+def collate_fn(batch: list[Picks]) \
+        -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     """
     Custom collate function to pad sequences in a batch.
 
@@ -34,38 +33,42 @@ def collate_fn(batch: list[Picks]) -> tuple[torch.Tensor, torch.Tensor]:
         batch: List of Picks objects.
 
     Returns:
-        Tuple of padded x and y tensors.
+        Tuple of padded x, y and station id tensors.
     """
-    xs = [item.x for item in batch]
-    ys = [item.y for item in batch]
+    stations = [torch.tensor(item.x.station_id.to_numpy()) for item in batch]
+    xs = [torch.tensor(item.x.drop(columns='station_id').to_numpy())
+          for item in batch]
+    ys = [torch.tensor(item.y.to_numpy()) for item in batch]
 
+    # (batch, max_picks)
+    padded_stations = pad_sequence(stations, batch_first=True)
     # (batch, max_picks, feature_dim)
     padded_xs = pad_sequence(xs, batch_first=True)
     # (batch, max_picks)
     padded_ys = pad_sequence(ys, batch_first=True,
                              padding_value=-2)
 
-    return padded_xs.to(dtype=torch.float32), padded_ys.to(dtype=torch.long)
+    return (padded_xs.to(dtype=torch.float32), padded_ys.to(dtype=torch.long),
+            padded_stations.to(dtype=torch.long))
 
 
-def scale_data(sample: torch.Tensor) -> torch.Tensor:
-    scaler = MinMaxScaler()
-    return torch.tensor(scaler.fit_transform(sample))
+def collate_fn_validate(batch: list[Picks]) -> tuple:
+    catalog = torch.tensor(batch[0].catalog.to_numpy())
+    x, y, st = collate_fn(batch)
+    return x, y, st, catalog
 
 
 ds = PhasePicksDataset(
-    root_dir='data/reference/low_freq',
+    root_dir='data/reference/all',
     stations_file='stations.csv',
     file_mask='arrivals_*.csv',
     catalog_mask='catalog_*.csv',
     transform=transforms.Compose([
-        ReduceDatetime(datetime=datetime(2025, 1, 1, 0, 0, 0)),
-        NDArrayTransformX(drop_cols=['station'],
-                          cat_cols=['phase']),
-        scale_data,
-    ]),
-    target_transform=NDArrayTransform(),
-    catalog_transform=NDArrayTransform(),
+        ReduceDatetime(),
+        ColumnsTransform(drop_cols=['station'],
+                         cat_cols=['phase']),
+        ScaleTransform(columns=['time', 'amplitude', 'e', 'n', 'u']),
+    ])
 )
 
 # number of features: ds[0].x.shape[1]
@@ -76,14 +79,17 @@ ds = PhasePicksDataset(
 # catalog: ds[0].catalog
 
 generator = torch.Generator()  # .manual_seed(42)
-train_dataset, test_dataset, _ = random_split(
+train_dataset, test_dataset, validate_dataset = random_split(
     ds, [0.02, 0.01, 0.97], generator=generator)
 
 test_loader = DataLoader(test_dataset, batch_size=1, collate_fn=collate_fn)
-train_loader = DataLoader(train_dataset, batch_size=4,
+train_loader = DataLoader(train_dataset, batch_size=1,
                           num_workers=0, shuffle=True, collate_fn=collate_fn)
+validate_loader = DataLoader(validate_dataset, batch_size=1,
+                             num_workers=0, collate_fn=collate_fn_validate)
 
 print('Data Loader Prepared')
+
 # %% DEFINITIONS
 ###############################################################################
 
@@ -91,6 +97,7 @@ print('Data Loader Prepared')
 class PhasePickTransformer(nn.Module):
     def __init__(self,
                  input_dim: int,
+                 num_stations: int,
                  embed_dim: int = 128,
                  num_heads: int = 4,
                  num_layers: int = 2,
@@ -102,6 +109,9 @@ class PhasePickTransformer(nn.Module):
 
         # Project input features to Transformer embedding dim
         self.feature_proj = nn.Linear(input_dim, embed_dim)
+
+        # Learnable station embedding
+        self.station_embedding = nn.Embedding(num_stations, embed_dim)
 
         # Learnable positional encoding
         self.positional_enc = nn.Parameter(torch.rand(max_picks, embed_dim))
@@ -125,21 +135,21 @@ class PhasePickTransformer(nn.Module):
 
     def forward(self,
                 pick_features: torch.tensor,
-                pick_times: torch.tensor) -> torch.tensor:
+                station_ids: torch.tensor) -> torch.tensor:
         """
         pick_features: Tensor (batch, N, feature_dim)
         pick_times: Tensor (batch, N) — used for sorting
         """
-        batch_size, num_picks, _ = pick_features.shape
-
-        # Sort picks by time
-        sorted_idx = torch.argsort(pick_times, dim=1)
-        batch_indices = torch.arange(
-            batch_size).unsqueeze(1).expand(-1, num_picks)
-        sorted_features = pick_features[batch_indices, sorted_idx]
+        num_picks = pick_features.shape[1]
 
         # Project features
-        x = self.feature_proj(sorted_features)  # (batch, N, embed_dim)
+        # (batch, N, embed_dim)
+        x = self.feature_proj(pick_features)
+
+        # Lookup and add station embeddings
+        # (batch, N, embed_dim)
+        station_embs = self.station_embedding(station_ids)
+        x = x + station_embs
 
         # Add positional encodings
         # (1, N, embed_dim)
@@ -149,10 +159,6 @@ class PhasePickTransformer(nn.Module):
         x = x.transpose(0, 1)
         x = self.transformer(x)
         x = x.transpose(0, 1)  # (batch, N, embed_dim)
-
-        # Reorder to original pick order
-        inv_idx = torch.argsort(sorted_idx, dim=1)
-        x = x[batch_indices, inv_idx]
 
         # Project to output embedding
         x = self.output_proj(x)  # (batch, N, output_dim)
@@ -213,17 +219,18 @@ def train(model, loss_func, mining_func, device,
           train_loader, optimizer, epoch,
           scheduler: torch.optim.lr_scheduler.StepLR):
     model.train()
-    for i, (x, y) in enumerate(train_loader):
+    for i, (x, y, st) in enumerate(train_loader):
         # (batch, picks, feat)
         x = x.to(device)
-        pick_times = x[..., 0]
         # (batch, picks)
         y = y.to(device)
+        # (batch, picks)
+        st = st.to(device)
 
         optimizer.zero_grad()
 
         # (batch, picks, out_feats)
-        embeddings = model(x, pick_times)
+        embeddings = model(x, st)
 
         # Flatten batch * picks
         flat_embeddings = embeddings.view(-1, embeddings.size(-1))
@@ -256,13 +263,12 @@ def test_cluster(loader, model, accuracy_calculator, device):
     model.eval()
     ari = 0
 
-    for x, y in loader:
+    for x, y, st in loader:
         x = x.to(device)
         y = y.to(device)
+        st = st.to(device)
 
-        pick_times = x[..., 0]
-
-        embeddings = model(x, pick_times)
+        embeddings = model(x, st)
         flat_embeddings = embeddings.view(-1, embeddings.size(-1))
         flat_labels = y.view(-1)
 
@@ -316,11 +322,11 @@ accuracy_calculator = CustomAccuracyCalculator(
 # ## Model
 # model = NN(ds[0].x.shape[1], 64, 16).to(device)
 model = PhasePickTransformer(
-    input_dim=ds[0].x.shape[1], embed_dim=128, num_heads=4,
-    num_layers=2, max_picks=1000).to(device)
+    input_dim=ds[0].x.shape[1]-1, num_stations=len(ds.stations), embed_dim=128,
+    num_heads=4, num_layers=2, max_picks=1000).to(device)
 
 # ## Epochs
-num_epochs = 10
+num_epochs = 1
 steps_per_epoch = len(train_loader)
 total_steps = num_epochs * steps_per_epoch
 
@@ -360,17 +366,20 @@ for epoch in range(1, num_epochs + 1):
 
 # %% VALIDATION
 ###############################################################################
-model.load_state_dict(torch.load(
-    'model_2s_5hz', weights_only=True, map_location=torch.device('cpu')))
-test_cluster(test_loader, model, accuracy_calculator, device)
+# model.load_state_dict(torch.load(
+#     'model_2s_5hz', weights_only=True, map_location=torch.device('cpu')))
+# test_cluster(test_loader, model, accuracy_calculator, device)
 
 
 # %% VISUALIZATION
 ###############################################################################
-data = next(itertools.islice(test_loader, 44, None))
-x = data.x.squeeze().to(device)
-embeddings = model(x)
+x, y, st, cat = next(itertools.islice(validate_loader, 44, None))
+x = x.to(device)
+st = st.to(device)
+embeddings = model(x, st)
 embeddings = embeddings.cpu().squeeze().detach().numpy()
-labels = data.y.squeeze().cpu().numpy()
+labels = y.squeeze().cpu().numpy()
 
-plot_embeddings_reduced(embeddings, labels, data.catalog, method='tsne')
+plot_embeddings_reduced(embeddings, labels, cat, method='tsne')
+
+# %%
