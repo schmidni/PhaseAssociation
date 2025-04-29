@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 
-from src.clustering.dataset import PhasePicksDataset
+from src.dataset import PhasePicksDataset
 from src.gamma.utils import association
 
 

@@ -3,27 +3,51 @@ import os
 from collections import namedtuple
 
 import pandas as pd
+import torch
 from sklearn.preprocessing import MinMaxScaler
+from torch.nn.utils.rnn import pad_sequence
 from torch.utils.data import Dataset
 
 Picks = namedtuple('Picks', ['x', 'y', 'catalog'])
 
 
-def parse_synthetic_picks(picks: pd.DataFrame, stations: pd.DataFrame):
+def parse_synthetic_picks(picks: pd.DataFrame, stations: pd.DataFrame) \
+        -> tuple[pd.DataFrame, pd.Series | None]:
+    """
+    Parse synthetic picks from a DataFrame and join with station information.
 
-    picks['time'] = pd.to_datetime(picks['time'], unit='ns').values.astype(int)
+    Args:
+        picks: DataFrame containing pick information.
+        stations: DataFrame containing station information.
+    Returns:
+        picks: DataFrame with parsed pick information and joined station data.
+        labels: Series containing labels for the picks, if available.
+    """
+
+    # join relevant station information
     picks = picks.join(stations.set_index('id'), on='station')
     picks = picks.drop(columns=['longitude', 'latitude', 'altitude'])
+    station_index_mapping = pd.Series(stations.index, index=stations['id'])
+    picks['id_index'] = picks['station'].map(station_index_mapping)
+
+    # process time information, sort by time (IMPORTANT)
+    picks['time'] = pd.to_datetime(picks['time'], unit='ns').values.astype(int)
     picks = picks.sort_values(by='time')
 
-    station_index_mapping = pd.Series(stations.index, index=stations['id'])
-    picks['station_id'] = picks['station'].map(station_index_mapping)
-
+    # extract labels
     if 'event' in picks.columns:
         labels = picks['event']
         picks = picks.drop(columns=['event'])
     else:
         labels = None
+
+    # consistent naming and fixed column order
+    picks = picks.rename(columns={'station': 'id',
+                                  'phase': 'type',
+                                  'amplitude': 'amp',
+                                  'time': 'timestamp'})
+    picks = picks[['e', 'n', 'u', 'timestamp',
+                   'type', 'amp', 'id', 'id_index']]
 
     return picks, labels
 
@@ -100,10 +124,6 @@ class GaMMAPickFormat:
         pass
 
     def __call__(self, sample):
-        sample = sample.rename(columns={'station': 'id',
-                                        'phase': 'type',
-                                        'amplitude': 'amp',
-                                        'time': 'timestamp'})
         sample = sample[sample.columns.intersection(
             ['id', 'timestamp', 'type', 'amp'])]
         sample['timestamp'] = pd.to_datetime(sample['timestamp'], unit='ns')
@@ -139,7 +159,7 @@ class ColumnsTransform:
 
 
 class ReduceDatetime:
-    def __init__(self, column='time'):
+    def __init__(self, column='timestamp'):
         self.column = column
 
     def __call__(self, sample):
@@ -148,24 +168,62 @@ class ReduceDatetime:
         return sample
 
 
-class SortDatetime:
-    def __init__(self):
-        pass
-
-    def __call__(self, sample: pd.DataFrame, label: pd.Series | None = None):
-        print(sample)
-        # sort sample and label by time
-        sample = sample.sort_values(by='time')
-        label = label.reindex(sample.index)
-        print(sample)
-        return (sample, label) if label is not None else sample
-
-
 class ScaleTransform:
-    def __init__(self, columns=[]):
+    def __init__(self, columns, scaler=MinMaxScaler()):
         self.columns = columns
-        self.scaler = MinMaxScaler()
+        self.scaler = scaler
 
     def __call__(self, sample: pd.DataFrame) -> pd.DataFrame:
         sample[self.columns] = self.scaler.fit_transform(sample[self.columns])
         return sample
+
+
+def collate_fn(batch: list[Picks]) \
+        -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    """
+    Custom collate function to return pick data as tensors
+    for training in a neural netowork.
+
+    Args:
+        batch: List of Picks objects.
+
+    Returns:
+        Tuple of padded x, y and station_id tensors.
+    """
+    stations = [torch.tensor(item.x['id_index'].to_numpy()) for item in batch]
+    xs = [torch.tensor(item.x.drop(columns='id_index').to_numpy())
+          for item in batch]
+    ys = [torch.tensor(item.y.to_numpy()) for item in batch]
+
+    # (batch, max_picks)
+    padded_stations = pad_sequence(stations, batch_first=True)
+    # (batch, max_picks, feature_dim)
+    padded_xs = pad_sequence(xs, batch_first=True)
+    # (batch, max_picks)
+    padded_ys = pad_sequence(ys, batch_first=True,
+                             padding_value=-2)
+
+    return (padded_xs.to(dtype=torch.float32), padded_ys.to(dtype=torch.long),
+            padded_stations.to(dtype=torch.long))
+
+
+def collate_fn_validate(batch: list[Picks]) -> tuple[torch.Tensor,
+                                                     torch.Tensor,
+                                                     torch.Tensor,
+                                                     torch.Tensor]:
+    """
+    Custom collate function to return pick data, including catalog,
+    as tensors for validation. Requires batch size of 1.
+
+    Args:
+        batch: List of Picks objects.
+
+    Returns:
+        Tuple of x, y, station_id and catalog tensors.
+    """
+    if len(batch) > 1:
+        raise ValueError('Batch size must be 1 for validation.')
+
+    catalog = torch.tensor(batch[0].catalog.to_numpy())
+    x, y, st = collate_fn(batch)
+    return x, y, st, catalog

@@ -12,10 +12,9 @@ from torch.utils.data import DataLoader
 from torchvision import transforms
 
 from create_synthetic_data import create_synthetic_data
-from src.clustering.dataset import (NDArrayTransform, NDArrayTransformX,
-                                    PhasePicksDataset)
-from src.clustering.utils import ClusterStatistics
+from src.dataset import NDArrayTransform, NDArrayTransformX, PhasePicksDataset
 from src.synthetics.create_associations import inventory_to_stations
+from src.utils import ClusterStatistics
 
 # %%
 stations = inventory_to_stations('stations/station_cords_blab_VALTER.csv')

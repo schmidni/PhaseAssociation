@@ -8,13 +8,12 @@ from pytorch_metric_learning.utils.accuracy_calculator import \
 from sklearn.cluster import KMeans
 from sklearn.metrics import adjusted_rand_score
 from torch import nn
-from torch.nn import functional as F
-from torch.nn.utils.rnn import pad_sequence
 from torch.utils.data import DataLoader, random_split
 from torchvision import transforms
 
-from src.clustering.dataset import (ColumnsTransform, PhasePicksDataset, Picks,
-                                    ReduceDatetime, ScaleTransform)
+from src.dataset import (ColumnsTransform, PhasePicksDataset, ReduceDatetime,
+                         ScaleTransform, collate_fn, collate_fn_validate)
+from src.models import PositionalEncoding
 from src.plotting.embeddings import plot_embeddings_reduced
 
 # %% Load data
@@ -23,60 +22,18 @@ from src.plotting.embeddings import plot_embeddings_reduced
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 print(f'Running models on {device}.')
 
-
-def collate_fn(batch: list[Picks]) \
-        -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-    """
-    Custom collate function to pad sequences in a batch.
-
-    Args:
-        batch: List of Picks objects.
-
-    Returns:
-        Tuple of padded x, y and station id tensors.
-    """
-    stations = [torch.tensor(item.x.station_id.to_numpy()) for item in batch]
-    xs = [torch.tensor(item.x.drop(columns='station_id').to_numpy())
-          for item in batch]
-    ys = [torch.tensor(item.y.to_numpy()) for item in batch]
-
-    # (batch, max_picks)
-    padded_stations = pad_sequence(stations, batch_first=True)
-    # (batch, max_picks, feature_dim)
-    padded_xs = pad_sequence(xs, batch_first=True)
-    # (batch, max_picks)
-    padded_ys = pad_sequence(ys, batch_first=True,
-                             padding_value=-2)
-
-    return (padded_xs.to(dtype=torch.float32), padded_ys.to(dtype=torch.long),
-            padded_stations.to(dtype=torch.long))
-
-
-def collate_fn_validate(batch: list[Picks]) -> tuple:
-    catalog = torch.tensor(batch[0].catalog.to_numpy())
-    x, y, st = collate_fn(batch)
-    return x, y, st, catalog
-
-
 ds = PhasePicksDataset(
-    root_dir='data/reference/all',
+    root_dir='data/reference/low_freq',
     stations_file='stations.csv',
     file_mask='arrivals_*.csv',
     catalog_mask='catalog_*.csv',
     transform=transforms.Compose([
         ReduceDatetime(),
-        ColumnsTransform(drop_cols=['station'],
-                         cat_cols=['phase']),
-        ScaleTransform(columns=['time', 'amplitude', 'e', 'n', 'u']),
+        ColumnsTransform(drop_cols=['id'],
+                         cat_cols=['type']),
+        ScaleTransform(columns=['timestamp', 'amp', 'e', 'n', 'u']),
     ])
 )
-
-# number of features: ds[0].x.shape[1]
-# number of catalogs: len(ds)
-# number of picks per catalog: ds[0].x.shape[0]
-# number of events per catalog: len(np.unique(ds[0].y)) - 1
-# stations: ds.stations
-# catalog: ds[0].catalog
 
 generator = torch.Generator()  # .manual_seed(42)
 train_dataset, test_dataset, validate_dataset = random_split(
@@ -89,9 +46,6 @@ validate_loader = DataLoader(validate_dataset, batch_size=1,
                              num_workers=0, collate_fn=collate_fn_validate)
 
 print('Data Loader Prepared')
-
-# %% DEFINITIONS
-###############################################################################
 
 
 class PhasePickTransformer(nn.Module):
@@ -114,14 +68,18 @@ class PhasePickTransformer(nn.Module):
         self.station_embedding = nn.Embedding(num_stations, embed_dim)
 
         # Learnable positional encoding
-        self.positional_enc = nn.Parameter(torch.rand(max_picks, embed_dim))
+        self.positional_encoding = \
+            PositionalEncoding(embed_dim,
+                               max_len=max_picks,
+                               encoding_type='sinusoidal')
 
         # Transformer Encoder
-        encoder_layer = nn.TransformerEncoderLayer(
-            d_model=embed_dim, nhead=num_heads, dim_feedforward=256
-        )
-        self.transformer = nn.TransformerEncoder(
-            encoder_layer, num_layers=num_layers)
+        encoder_layer = nn.TransformerEncoderLayer(d_model=embed_dim,
+                                                   nhead=num_heads,
+                                                   dim_feedforward=256,
+                                                   batch_first=True)
+        self.transformer = nn.TransformerEncoder(encoder_layer,
+                                                 num_layers=num_layers)
 
         # MLP projection head to output dimension
         self.output_proj = nn.Sequential(
@@ -140,8 +98,6 @@ class PhasePickTransformer(nn.Module):
         pick_features: Tensor (batch, N, feature_dim)
         pick_times: Tensor (batch, N) — used for sorting
         """
-        num_picks = pick_features.shape[1]
-
         # Project features
         # (batch, N, embed_dim)
         x = self.feature_proj(pick_features)
@@ -153,12 +109,9 @@ class PhasePickTransformer(nn.Module):
 
         # Add positional encodings
         # (1, N, embed_dim)
-        x = x + self.positional_enc[:num_picks].unsqueeze(0)
+        x = self.positional_encoding(x)
 
-        # Transformer expects (N, batch, embed_dim)
-        x = x.transpose(0, 1)
-        x = self.transformer(x)
-        x = x.transpose(0, 1)  # (batch, N, embed_dim)
+        x = self.transformer(x)  # (batch, N, embed_dim)
 
         # Project to output embedding
         x = self.output_proj(x)  # (batch, N, output_dim)
@@ -166,37 +119,6 @@ class PhasePickTransformer(nn.Module):
         # Normalize
         emb = self.normalize(x, p=2, dim=-1)
         return emb
-
-
-class PhasePickMLP(torch.nn.Module):
-    def __init__(self, in_feats, h_feats, out_feats):
-        super().__init__()
-        self.linear_relu_stack = nn.Sequential(
-            nn.Linear(in_feats, h_feats),
-            nn.BatchNorm1d(h_feats),
-            nn.ReLU(),
-            nn.Linear(h_feats, 2 * h_feats),
-            nn.BatchNorm1d(2 * h_feats),
-            nn.ReLU(),
-            nn.Linear(2 * h_feats, h_feats),
-            nn.BatchNorm1d(h_feats),
-            nn.ReLU(),
-            nn.Linear(h_feats, out_feats)
-        )
-
-    def forward(self, pick_features, *args, **kwargs):
-        """
-        pick_features: Tensor of shape (batch, picks, feature_dim)
-        """
-        batch_size, num_picks, _ = pick_features.shape
-        # (batch * picks, feature_dim)
-        x = pick_features.view(-1, pick_features.size(-1))
-        # (batch * picks, out_feats)
-        x = self.linear_relu_stack(x)
-        x = F.normalize(x, p=2, dim=1)
-        # back to (batch, picks, out_feats)
-        x = x.view(batch_size, num_picks, -1)
-        return x
 
 
 def remap_noise_labels(labels):

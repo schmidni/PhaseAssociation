@@ -7,8 +7,8 @@ import os
 import pandas as pd
 from matplotlib import pyplot as plt
 
-from src.clustering.dataset import GaMMAStationFormat, PhasePicksDataset
-from src.clustering.models import run_gamma
+from src.dataset import GaMMAStationFormat, PhasePicksDataset
+from src.runners import run_gamma
 
 # %% preprocess
 catalog_files = sorted(

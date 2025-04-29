@@ -6,10 +6,9 @@ import torch
 import tqdm
 from torch.utils.data import random_split
 
-from src.clustering.dataset import (GaMMAPickFormat, GaMMAStationFormat,
-                                    PhasePicksDataset)
-from src.clustering.models import run_gamma
-from src.clustering.utils import ClusterStatistics  # , plot_arrivals
+from src.dataset import GaMMAPickFormat, GaMMAStationFormat, PhasePicksDataset
+from src.runners import run_gamma
+from src.utils import ClusterStatistics  # , plot_arrivals
 
 config = {
     "ncpu": multiprocessing.cpu_count()-1,

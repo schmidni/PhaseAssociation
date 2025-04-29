@@ -6,9 +6,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-from src.clustering.dataset import (GaMMAPickFormat, GaMMAStationFormat,
-                                    PhasePicksDataset)
-from src.clustering.models import run_gamma
+from src.dataset import GaMMAPickFormat, GaMMAStationFormat, PhasePicksDataset
+from src.runners import run_gamma
 
 config = {
     "ncpu": multiprocessing.cpu_count(),

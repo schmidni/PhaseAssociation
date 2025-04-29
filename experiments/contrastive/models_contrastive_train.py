@@ -16,8 +16,7 @@ from torch import nn
 from torch.utils.data import DataLoader, random_split
 from torchvision import transforms
 
-from src.clustering.dataset import (NDArrayTransform, NDArrayTransformX,
-                                    PhasePicksDataset)
+from src.dataset import NDArrayTransform, NDArrayTransformX, PhasePicksDataset
 
 # %%
 # Load data

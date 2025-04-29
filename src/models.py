@@ -1,0 +1,91 @@
+# %% DEFINITIONS
+###############################################################################
+
+
+import math
+
+import torch
+from torch import nn
+from torch.nn import functional as F
+
+
+class PositionalEncoding(nn.Module):
+    def __init__(self, embed_dim, max_len=5000, encoding_type="learnable"):
+        super().__init__()
+        self.embed_dim = embed_dim
+        self.encoding_type = encoding_type
+
+        self.cached_encoding = None
+        self.cached_seq_len = 0
+
+        if encoding_type == "learnable":
+            self.positional_encoding = nn.Parameter(
+                torch.zeros(max_len, embed_dim))
+            nn.init.xavier_uniform_(self.positional_encoding)
+
+    def forward(self, x):
+        seq_len, device = x.size(1), x.device
+
+        if self.encoding_type == "learnable":
+            pos_enc = self.positional_encoding[:seq_len].unsqueeze(0)
+        else:
+            if (self.cached_encoding is None
+                or self.cached_encoding.device != device
+                    or seq_len > self.cached_seq_len):
+                pos_enc = self._generate_encoding(seq_len, device)
+                self.cached_encoding = pos_enc
+                self.cached_seq_len = seq_len
+            else:
+                pos_enc = self.cached_encoding[:, :seq_len]
+
+        return x + pos_enc
+
+    def _generate_encoding(self, seq_len, device):
+        if self.encoding_type == "sinusoidal":
+            position = torch.arange(seq_len, device=device).unsqueeze(1)
+            div_term = torch.exp(
+                torch.arange(0, self.embed_dim, 2, device=device) *
+                -(math.log(10000.0) / self.embed_dim))
+            pe = torch.zeros(seq_len, self.embed_dim, device=device)
+            pe[:, 0::2] = torch.sin(position * div_term)
+            pe[:, 1::2] = torch.cos(position * div_term)
+            return pe.unsqueeze(0)
+        elif self.encoding_type == "linear":
+            pe = torch.linspace(0, 1, steps=seq_len,
+                                device=device).unsqueeze(1)
+            pe = pe.expand(seq_len, self.embed_dim)
+            return pe.unsqueeze(0)
+        else:
+            raise ValueError(
+                f"Unknown positional encoding type: {self.encoding_type}")
+
+
+class PhasePickMLP(torch.nn.Module):
+    def __init__(self, in_feats, h_feats, out_feats):
+        super().__init__()
+        self.linear_relu_stack = nn.Sequential(
+            nn.Linear(in_feats, h_feats),
+            nn.BatchNorm1d(h_feats),
+            nn.ReLU(),
+            nn.Linear(h_feats, 2 * h_feats),
+            nn.BatchNorm1d(2 * h_feats),
+            nn.ReLU(),
+            nn.Linear(2 * h_feats, h_feats),
+            nn.BatchNorm1d(h_feats),
+            nn.ReLU(),
+            nn.Linear(h_feats, out_feats)
+        )
+
+    def forward(self, pick_features, *args, **kwargs):
+        """
+        pick_features: Tensor of shape (batch, picks, feature_dim)
+        """
+        batch_size, num_picks, _ = pick_features.shape
+        # (batch * picks, feature_dim)
+        x = pick_features.view(-1, pick_features.size(-1))
+        # (batch * picks, out_feats)
+        x = self.linear_relu_stack(x)
+        x = F.normalize(x, p=2, dim=1)
+        # back to (batch, picks, out_feats)
+        x = x.view(batch_size, num_picks, -1)
+        return x
