@@ -6,8 +6,8 @@ import tqdm
 from torch.utils.data import random_split
 
 from src.dataset import GaMMAPickFormat, GaMMAStationFormat, PhasePicksDataset
+from src.metrics import ClusterStatistics  # , plot_arrivals
 from src.runners import run_pyocto
-from src.utils import ClusterStatistics  # , plot_arrivals
 
 velocity_model = pyocto.VelocityModel0D(
     p_velocity=5.5,

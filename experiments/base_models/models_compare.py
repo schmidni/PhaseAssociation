@@ -9,9 +9,9 @@ from tqdm import tqdm
 
 from create_synthetic_data import create_synthetic_data
 from src.dataset import GaMMAPickFormat, GaMMAStationFormat, PhasePicksDataset
+from src.metrics import ClusterStatistics
 from src.runners import run_gamma, run_pyocto
 from src.synthetics.create_associations import inventory_to_stations
-from src.utils import ClusterStatistics
 
 # %%
 stations = inventory_to_stations('stations/station_cords_blab_VALTER.csv')
