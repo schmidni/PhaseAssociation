@@ -2,11 +2,11 @@
 import itertools
 
 import torch
-from pytorch_metric_learning import distances, losses, miners, reducers
 from torch import nn
 from torch.utils.data import DataLoader, random_split
 from torchvision import transforms
 
+from src import losses
 from src.dataset import (ColumnsTransform, PhasePicksDataset, ReduceDatetime,
                          ScaleTransform, collate_fn, collate_fn_validate)
 from src.metrics import ClusterStatistics
@@ -20,7 +20,7 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 print(f'Running models on {device}.')
 
 ds = PhasePicksDataset(
-    root_dir='data/reference/low_freq',
+    root_dir='data/reference/2s_5hz',
     stations_file='stations.csv',
     file_mask='arrivals_*.csv',
     catalog_mask='catalog_*.csv',
@@ -32,13 +32,14 @@ ds = PhasePicksDataset(
     ])
 )
 
-generator = torch.Generator()  # .manual_seed(42)
+generator = torch.Generator().manual_seed(42)
 train_dataset, test_dataset, validate_dataset = random_split(
-    ds, [0.025, 0.01, 0.965], generator=generator)
+    ds, [0.3, 0.1, 0.6], generator=generator)
 
-test_loader = DataLoader(test_dataset, batch_size=1, collate_fn=collate_fn)
-train_loader = DataLoader(train_dataset, batch_size=1,
+train_batch_size = 1
+train_loader = DataLoader(train_dataset, batch_size=train_batch_size,
                           num_workers=0, shuffle=True, collate_fn=collate_fn)
+test_loader = DataLoader(test_dataset, batch_size=1, collate_fn=collate_fn)
 validate_loader = DataLoader(validate_dataset, batch_size=1,
                              num_workers=0, collate_fn=collate_fn_validate)
 
@@ -209,8 +210,6 @@ def train(model, loss_func, mining_func, device,
             running_loss = 0.0
             running_triplets = 0
 
-# %%
-
 
 @torch.no_grad()
 def test_cluster(loader, model, device):
@@ -241,42 +240,32 @@ def test_cluster(loader, model, device):
 # %% INSTANTIATIONS
 ###############################################################################
 # ## Metric Learning
-distance = distances.CosineSimilarity()
-reducer = reducers.AvgNonZeroReducer()
+
+num_epochs = 3
+total_steps = int(num_epochs * len(train_loader) / train_batch_size)
 
 # ## Model
-# model = NN(ds[0].x.shape[1], 64, 16).to(device)
 model = PhasePickTransformer(
     input_dim=ds[0].x.shape[1]-1, num_stations=len(ds.stations), embed_dim=128,
     num_heads=4, num_layers=2, max_picks=1000).to(device)
 
-# ## Epochs
-num_epochs = 1
-steps_per_epoch = len(train_loader)
-total_steps = num_epochs * steps_per_epoch
-
-
 # ## Scheduler and Optimizer
-# AdamW optimizer with initial LR (max LR will be set by scheduler)
-optimizer = torch.optim.AdamW(model.parameters(), lr=1e-3)
-# This will start at max_lr/div_factor (default
-# div_factor=25 if not provided, here final_div_factor=30 for end LR)
-# and peak at 1e-3 around 30% of training, then cosine anneal down to
-# max_lr/final_div_factor.
+
+optimizer = torch.optim.AdamW(model.parameters())  # LR set by scheduler
+
+# Start at max_lr/div_factor, peak at 30% of training, cosine
+# anneal down to max_lr/final_div_factor.
 scheduler = torch.optim.lr_scheduler.OneCycleLR(
     optimizer, max_lr=1e-3, total_steps=total_steps, pct_start=0.3,
     anneal_strategy='cos', final_div_factor=30
 )
 
+metric_loss = losses.metric_loss_multi_similarity
+
 # %% TRAINING
 ###############################################################################
 for epoch in range(1, num_epochs + 1):
-    margin = 0.2 + (epoch * 0.4/num_epochs)
-
-    mining_func = miners.TripletMarginMiner(
-        margin=margin, distance=distance, type_of_triplets='semihard')
-    loss_func = losses.TripletMarginLoss(
-        margin=margin, distance=distance, reducer=reducer)
+    mining_func, loss_func = metric_loss(epoch, num_epochs)
 
     train(model, loss_func, mining_func, device,
           train_loader, optimizer, epoch, scheduler)

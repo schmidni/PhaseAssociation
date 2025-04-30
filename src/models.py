@@ -89,3 +89,42 @@ class PhasePickMLP(torch.nn.Module):
         # back to (batch, picks, out_feats)
         x = x.view(batch_size, num_picks, -1)
         return x
+
+
+class PrototypicalLoss(torch.nn.Module):
+    def __init__(self, distance='euclidean'):
+        super().__init__()
+        assert distance in ['euclidean', 'cosine']
+        self.distance = distance
+
+    def forward(self, embeddings: torch.Tensor, labels: torch.Tensor,
+                *args, **kwargs):
+        """
+        embeddings: (N, D)
+        labels: (N,)
+        """
+        device = embeddings.device
+        N, D = embeddings.shape
+        classes, labels_idx = torch.unique(labels, return_inverse=True)
+        C = classes.size(0)
+
+        # Compute class counts
+        counts = torch.bincount(
+            labels_idx, minlength=C).float().unsqueeze(1)  # (C, 1)
+
+        # Sum embeddings per class
+        prototypes = torch.zeros(C, D, device=device).scatter_add_(
+            0, labels_idx.unsqueeze(1).expand(-1, D), embeddings)
+        prototypes = prototypes / counts  # (C, D)
+
+        if self.distance == 'euclidean':
+            dists = torch.cdist(embeddings, prototypes, p=2)
+        else:
+            embeddings = F.normalize(embeddings, p=2, dim=1)
+            prototypes = F.normalize(prototypes, p=2, dim=1)
+            dists = 1 - embeddings @ prototypes.T
+
+        # Use index mapping directly
+        targets = labels_idx
+
+        return F.cross_entropy(-dists, targets)
