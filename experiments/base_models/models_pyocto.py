@@ -1,4 +1,6 @@
 # %% Imports and Configuration
+import itertools
+
 import pyocto
 import tqdm
 
@@ -59,7 +61,7 @@ ds = PhasePicksDataset(
     station_transform=GaMMAStationFormat()
 )
 
-for sample in tqdm.tqdm([ds[0]]):
+for sample in tqdm.tqdm(itertools.islice(ds, 5)):
     events, labels_pred = run_pyocto(sample.x, ds.stations, associator)
 
     statistics.add(sample.y.to_numpy(),

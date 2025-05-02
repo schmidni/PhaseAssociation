@@ -1,4 +1,5 @@
 # %% Imports and Configuration
+import itertools
 import multiprocessing
 
 import tqdm
@@ -47,7 +48,7 @@ ds = PhasePicksDataset(
 )
 
 
-for sample in tqdm.tqdm([ds[0]]):
+for sample in tqdm.tqdm(itertools.islice(ds, 5)):
     cat_gmma, labels_pred = run_gamma(sample.x, ds.stations, config)
 
     statistics.add(sample.y.to_numpy(),

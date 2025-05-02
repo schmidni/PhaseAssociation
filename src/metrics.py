@@ -10,22 +10,23 @@ class ClusterStatistics:
         self._pcm = []
         self._event_confusion = []
 
-    def add_embedding(self, embeddings, labels_pred):
+    def add_embedding(self, embeddings, labels):
         # TODO: Clustering which deals with noise
         try:
             emb = embeddings.clone().cpu().numpy()
-            pred = labels_pred.clone().cpu().numpy()
+            lbl = labels.clone().cpu().numpy()
         except AttributeError:
-            pass
+            emb = embeddings
+            lbl = labels
 
-        num_clusters = len(np.unique(pred))
+        num_clusters = len(np.unique(lbl))
 
-        mask = pred != -1
+        mask = lbl != -1
 
         kmeans = KMeans(n_clusters=num_clusters, random_state=0).fit(
             emb[mask])
 
-        self.add(kmeans.labels_, pred[mask])
+        self.add(lbl[mask], kmeans.labels_)
 
     def add(self, labels, labels_pred):
 

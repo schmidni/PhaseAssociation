@@ -129,7 +129,8 @@ for key, value in data_config.items():
 for key, ds in datasets.items():
     print(f"Running {key} dataset")
     for sample in tqdm(ds):
-        cat_gmma, labels_pred = run_gamma(sample.x, ds.stations, config_gamma)
+        cat_gmma, labels_pred = run_gamma(
+            sample.x, ds.stations, config_gamma)
         stat_gamma[key].add(sample.y.to_numpy(),
                             labels_pred)
 

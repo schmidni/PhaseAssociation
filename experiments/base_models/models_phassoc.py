@@ -1,24 +1,11 @@
 # %% Imports and Configuration
-
 import itertools
 
 import tqdm
 
 from src.dataset import GaMMAPickFormat, GaMMAStationFormat, PhasePicksDataset
 from src.metrics import ClusterStatistics
-from src.runners import run_harpa
-
-config = {
-    "x(km)": (-1, 1),
-    "y(km)": (-1, 1),
-    "z(km)": (-1, 1),
-    "vel": {"P": 5.4, "S": 3.1},
-    "P_phase": True,
-    "S_phase": True,
-    "min_peak_pre_event": 5,
-    "min_peak_pre_event_s": 0,
-    "min_peak_pre_event_p": 0,
-}
+from src.runners import run_phassoc
 
 # %% Run GaMMA
 statistics = ClusterStatistics()
@@ -33,12 +20,12 @@ ds = PhasePicksDataset(
     station_transform=GaMMAStationFormat()
 )
 
+model = '../../model/model_m1'
 
 for sample in tqdm.tqdm(itertools.islice(ds, len(ds))):
-    cat, labels_pred = run_harpa(sample.x, ds.stations, config)
+    _, embeddings = run_phassoc(sample.x, ds.stations, model)
 
-    statistics.add(sample.y.to_numpy(),
-                   labels_pred)
+    statistics.add_embedding(embeddings, sample.y.to_numpy())
 
-print(f"HARPA ARI: {statistics.ari()}, Accuray: {statistics.accuracy()}, "
+print(f"PhAssoc ARI: {statistics.ari()}, Accuray: {statistics.accuracy()}, "
       f"Precision: {statistics.precision()}, Recall: {statistics.recall()}")
