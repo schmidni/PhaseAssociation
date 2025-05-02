@@ -1,9 +1,6 @@
 # %% Imports and Configuration
-# import pandas as pd
 import pyocto
-import torch
 import tqdm
-from torch.utils.data import random_split
 
 from src.dataset import GaMMAPickFormat, GaMMAStationFormat, PhasePicksDataset
 from src.metrics import ClusterStatistics  # , plot_arrivals
@@ -54,29 +51,22 @@ associator = pyocto.OctoAssociator(
 statistics = ClusterStatistics()
 
 ds = PhasePicksDataset(
-    root_dir='../../data/reference/low_freq',
+    root_dir='../../data/test',
     stations_file='stations.csv',
     file_mask='arrivals_*.csv',
     catalog_mask='catalog_*.csv',
     transform=GaMMAPickFormat(),
     station_transform=GaMMAStationFormat()
 )
-generator = torch.Generator().manual_seed(25)
-test_dataset, _ = random_split(
-    ds, [0.01, 0.99], generator=generator)
 
-for sample in tqdm.tqdm(test_dataset):
+for sample in tqdm.tqdm([ds[0]]):
     events, labels_pred = run_pyocto(sample.x, ds.stations, associator)
 
     statistics.add(sample.y.to_numpy(),
-                   labels_pred,
-                   sample.catalog,
-                   events)
+                   labels_pred)
 
 print(f"PyOcto ARI: {statistics.ari()}, Accuray: {statistics.accuracy()}, "
       f"Precision: {statistics.precision()}, Recall: {statistics.recall()}")
-print(f"PyOcto event precision: {statistics.event_precision()}, "
-      f"PyOcto event recall: {statistics.event_recall()}")
 
 # %% Plot Results
 # associations = sample.x.copy().join(ds.stations.set_index('id'), on='id')

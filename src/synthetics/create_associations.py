@@ -24,7 +24,7 @@ def create_associations(catalog: pd.DataFrame,
                         percentile: float,
                         startdate: datetime = datetime.now(),
                         add_noise_picks: bool = True,
-                        noise_tt: float = 0.05,
+                        noise_tt: float = 0.1,
                         noise_gmv: float = 0.025,
                         pc_noise_picks: float = 0.1
                         ) -> pd.DataFrame:

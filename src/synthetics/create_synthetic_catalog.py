@@ -15,10 +15,11 @@ def create_synthetic_catalog(n_events: int,
                              n: float,
                              u: float,
                              startdate: datetime = datetime.now(),
-                             fixed_mag: float | None = None
+                             fixed_mag: float | None = None,
+                             max_magnitude: float = 1.0,
                              ) -> pd.DataFrame:
     if fixed_mag is None:
-        mags = simulate_magnitudes(n_events, 1.6*np.log(10), -3.5)
+        mags = simulate_magnitudes(n_events, 1.6*np.log(10), max_magnitude)
     else:
         mags = np.full(n_events, fixed_mag)
 

@@ -128,3 +128,91 @@ class PrototypicalLoss(torch.nn.Module):
         targets = labels_idx
 
         return F.cross_entropy(-dists, targets)
+
+
+class PhasePickTransformer(nn.Module):
+    def __init__(self,
+                 input_dim: int,
+                 num_stations: int,
+                 embed_dim: int = 128,
+                 num_heads: int = 4,
+                 num_layers: int = 2,
+                 output_dim: int = 16,
+                 max_picks: int = 1000,
+                 encoding_type: str = 'sinusoidal'):
+        super(PhasePickTransformer, self).__init__()
+        self.embed_dim = embed_dim  # Transformer embedding dimension
+        self.output_dim = output_dim  # Final embedding dimension
+
+        # Project input features to Transformer embedding dim
+        self.feature_proj = nn.Linear(input_dim-3, embed_dim)
+
+        # Learnable station embedding
+        self.station_embedding = nn.Embedding(num_stations, embed_dim)
+
+        # Learnable positional encoding
+        self.positional_encoding = \
+            PositionalEncoding(embed_dim,
+                               max_len=max_picks,
+                               encoding_type=encoding_type)
+
+        # Transformer Encoder
+        encoder_layer = nn.TransformerEncoderLayer(d_model=embed_dim,
+                                                   nhead=num_heads,
+                                                   dim_feedforward=256,
+                                                   batch_first=True)
+        self.transformer = nn.TransformerEncoder(encoder_layer,
+                                                 num_layers=num_layers)
+
+        # MLP projection head to output dimension
+        self.output_proj = nn.Sequential(
+            nn.Linear(embed_dim, 64),
+            nn.ReLU(),
+            nn.Linear(64, self.output_dim)
+        )
+
+        # MLP projection for coordinates
+        self.coord_proj = nn.Sequential(
+            nn.Linear(3, 32),
+            nn.ReLU(),
+            nn.Linear(32, embed_dim)
+        )
+
+        # L2 normalization
+        self.normalize = nn.functional.normalize
+
+    def forward(self,
+                pick_features: torch.tensor,
+                station_ids: torch.tensor) -> torch.tensor:
+        """
+        pick_features: Tensor (batch, N, feature_dim)
+        pick_times: Tensor (batch, N) — used for sorting
+        """
+        # Project features
+        # (batch, N, embed_dim)
+        x = self.feature_proj(pick_features[:, :, 3:6])
+
+        # Add coordinate embeddings
+        # (batch, N, embed_dim)
+        coord_embs = self.coord_proj(pick_features[:, :, 0:3])
+        x = x + coord_embs
+
+        # Lookup and add station embeddings
+        # (batch, N, embed_dim)
+        station_embs = self.station_embedding(station_ids)
+        x = x + station_embs
+
+        # Add positional encodings
+        # (1, N, embed_dim)
+        x = self.positional_encoding(x)
+
+        # (batch, N, embed_dim)
+        x = self.transformer(x)
+
+        # Project to output embedding
+        # (batch, N, output_dim)
+        x = self.output_proj(x)
+
+        # Normalize
+        emb = self.normalize(x, p=2, dim=-1)
+        return emb

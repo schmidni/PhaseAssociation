@@ -1,10 +1,7 @@
 # %% Imports and Configuration
 import multiprocessing
 
-# import pandas as pd
-import torch
 import tqdm
-from torch.utils.data import random_split
 
 from src.dataset import GaMMAPickFormat, GaMMAStationFormat, PhasePicksDataset
 from src.metrics import ClusterStatistics  # , plot_arrivals
@@ -26,7 +23,7 @@ config = {
         (None, None),   # t
     ),
     "use_dbscan": True,
-    "dbscan_eps": 0.01,  # seconds
+    "dbscan_eps": 0.05,  # seconds
     "dbscan_min_samples": 5,
 
     "min_picks_per_eq": 8,
@@ -35,35 +32,32 @@ config = {
     # "max_sigma12": 2.0
 }
 
+
 # %% Run GaMMA
 statistics = ClusterStatistics()
 
+
 ds = PhasePicksDataset(
-    root_dir='../../data/reference/low_freq',
+    root_dir='../../data/test',
     stations_file='stations.csv',
     file_mask='arrivals_*.csv',
     catalog_mask='catalog_*.csv',
     transform=GaMMAPickFormat(),
     station_transform=GaMMAStationFormat()
 )
-generator = torch.Generator().manual_seed(42)
-test_dataset, _ = random_split(
-    ds, [0.01, 0.99], generator=generator)
 
-for sample in tqdm.tqdm(test_dataset):
+
+for sample in tqdm.tqdm([ds[0]]):
     cat_gmma, labels_pred = run_gamma(sample.x, ds.stations, config)
 
     statistics.add(sample.y.to_numpy(),
-                   labels_pred,
-                   sample.catalog,
-                   cat_gmma)
+                   labels_pred)
 
     print(f"GaMMA ARI: {statistics.ari()}, Accuray: {statistics.accuracy()}, ")
 
 print(f"GaMMA ARI: {statistics.ari()}, Accuray: {statistics.accuracy()}, "
       f"Precision: {statistics.precision()}, Recall: {statistics.recall()}")
-print(f"GaMMA event precision: {statistics.event_precision()}, "
-      f"GaMMA event recall: {statistics.event_recall()}")
+
 
 # %% Plot Results
 # associations = sample.x.copy().join(ds.stations.set_index('id'), on='id')
@@ -76,4 +70,3 @@ print(f"GaMMA event precision: {statistics.event_precision()}, "
 #               sample.catalog[['dx', 'time']],
 #               cat_gmma[['dx', 'time']],
 #               sample.y.to_numpy(), labels_pred)
-# %%

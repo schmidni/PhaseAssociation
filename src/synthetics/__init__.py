@@ -19,7 +19,11 @@ def create_synthetic_data(out_dir: Path,
                           startdate: datetime = datetime.now(),
                           fixed_mag: float | None = None,
                           add_noise_picks: bool = True,
-                          overwrite: bool = False):
+                          pc_noise_picks: float = 0.1,
+                          overwrite: bool = False,
+                          max_magnitude: float = 1.0,
+                          noise_tt: float = 0.1,
+                          noise_gmv: float = 0.05) -> None:
 
     center = np.array(
         [stations['e'].mean(), stations['n'].mean(), stations['u'].mean()])
@@ -30,7 +34,7 @@ def create_synthetic_data(out_dir: Path,
 
     if overwrite:
         shutil.rmtree(out_dir, ignore_errors=True)
-    out_dir.mkdir(parents=True)
+    out_dir.mkdir(parents=True, exist_ok=True)
 
     stations.to_csv(f'{out_dir}/stations.csv', index=False)
 
@@ -43,7 +47,8 @@ def create_synthetic_data(out_dir: Path,
                                            duration,
                                            *center,
                                            startdate=startdate,
-                                           fixed_mag=fixed_mag)
+                                           fixed_mag=fixed_mag,
+                                           max_magnitude=max_magnitude)
 
         arrivals = create_associations(catalog,
                                        stations,
@@ -51,7 +56,10 @@ def create_synthetic_data(out_dir: Path,
                                        v_s,
                                        percentile,
                                        startdate=startdate,
-                                       add_noise_picks=add_noise_picks)
+                                       add_noise_picks=add_noise_picks,
+                                       noise_tt=noise_tt,
+                                       noise_gmv=noise_gmv,
+                                       pc_noise_picks=pc_noise_picks)
 
         arrivals.to_csv(
             f'{out_dir}/arrivals_{duration}_{min_events}_{i}.csv', index=False)

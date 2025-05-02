@@ -26,6 +26,7 @@ def parse_synthetic_picks(picks: pd.DataFrame, stations: pd.DataFrame) \
 
     # join relevant station information
     picks = picks.join(stations.set_index('id'), on='station')
+
     picks = picks.drop(columns=['longitude', 'latitude', 'altitude'])
     station_index_mapping = pd.Series(stations.index, index=stations['id'])
     picks['id_index'] = picks['station'].map(station_index_mapping)
@@ -95,7 +96,7 @@ class PhasePicksDataset(Dataset):
         file = self.files[idx]
 
         samples = pd.read_csv(file)
-        samples, labels = self.input_fn(samples, self.stations)
+        samples, labels = self.input_fn(samples, self._stations)
 
         catalog = None
         if self.catalog_files:
@@ -124,11 +125,12 @@ class GaMMAPickFormat:
         pass
 
     def __call__(self, sample):
-        sample = sample[sample.columns.intersection(
+        s = sample.copy()
+        s = s[s.columns.intersection(
             ['id', 'timestamp', 'type', 'amp'])]
-        sample['timestamp'] = pd.to_datetime(sample['timestamp'], unit='ns')
-        sample['prob'] = 1
-        return sample
+        s['timestamp'] = pd.to_datetime(s['timestamp'], unit='ns')
+        s['prob'] = 1
+        return s
 
 
 class GaMMAStationFormat:
