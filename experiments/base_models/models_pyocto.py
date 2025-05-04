@@ -4,7 +4,8 @@ import itertools
 import pyocto
 import tqdm
 
-from src.dataset import GaMMAPickFormat, GaMMAStationFormat, PhasePicksDataset
+from src.dataset import (PhasePicksDataset, SeisBenchPickFormat,
+                         SeisBenchStationFormat)
 from src.metrics import ClusterStatistics  # , plot_arrivals
 from src.runners import run_pyocto
 
@@ -57,8 +58,8 @@ ds = PhasePicksDataset(
     stations_file='stations.csv',
     file_mask='arrivals_*.csv',
     catalog_mask='catalog_*.csv',
-    transform=GaMMAPickFormat(),
-    station_transform=GaMMAStationFormat()
+    transform=SeisBenchPickFormat(),
+    station_transform=SeisBenchStationFormat()
 )
 
 for sample in tqdm.tqdm(itertools.islice(ds, 5)):

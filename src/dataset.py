@@ -120,7 +120,7 @@ class PhasePicksDataset(Dataset):
         return df
 
 
-class GaMMAPickFormat:
+class SeisBenchPickFormat:
     def __init__(self):
         pass
 
@@ -133,7 +133,7 @@ class GaMMAPickFormat:
         return s
 
 
-class GaMMAStationFormat:
+class SeisBenchStationFormat:
     def __init__(self):
         pass
 

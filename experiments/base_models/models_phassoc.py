@@ -3,7 +3,9 @@ import itertools
 
 import tqdm
 
-from src.dataset import GaMMAPickFormat, GaMMAStationFormat, PhasePicksDataset
+from src import associate_phassoc
+from src.dataset import (PhasePicksDataset, SeisBenchPickFormat,
+                         SeisBenchStationFormat)
 from src.metrics import ClusterStatistics
 from src.runners import run_phassoc
 
@@ -16,8 +18,8 @@ ds = PhasePicksDataset(
     stations_file='stations.csv',
     file_mask='arrivals_*.csv',
     catalog_mask='catalog_*.csv',
-    transform=GaMMAPickFormat(),
-    station_transform=GaMMAStationFormat()
+    transform=SeisBenchPickFormat(),
+    station_transform=SeisBenchStationFormat()
 )
 
 model = '../../model/model_m1'

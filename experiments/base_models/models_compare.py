@@ -8,7 +8,8 @@ from matplotlib import pyplot as plt
 from tqdm import tqdm
 
 from create_synthetic_data import create_synthetic_data
-from src.dataset import GaMMAPickFormat, GaMMAStationFormat, PhasePicksDataset
+from src.dataset import (PhasePicksDataset, SeisBenchPickFormat,
+                         SeisBenchStationFormat)
 from src.metrics import ClusterStatistics
 from src.runners import run_gamma, run_pyocto
 from src.synthetics.create_associations import inventory_to_stations
@@ -118,8 +119,8 @@ for key, value in data_config.items():
         stations_file='stations.csv',
         file_mask='arrivals_*.csv',
         catalog_mask='catalog_*.csv',
-        transform=GaMMAPickFormat(),
-        station_transform=GaMMAStationFormat()
+        transform=SeisBenchPickFormat(),
+        station_transform=SeisBenchStationFormat()
     )
     stat_gamma[key] = ClusterStatistics()
     stat_pyocto[key] = ClusterStatistics()

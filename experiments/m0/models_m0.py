@@ -6,7 +6,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 
-from src.dataset import GaMMAPickFormat, GaMMAStationFormat, PhasePicksDataset
+from src.dataset import (PhasePicksDataset, SeisBenchPickFormat,
+                         SeisBenchStationFormat)
 from src.runners import run_gamma
 
 config = {
@@ -41,8 +42,8 @@ ds = PhasePicksDataset(
     stations_file='stations.csv',
     file_mask='m0_10s_formatted_high.csv',
     catalog_mask='catalog.csv',
-    transform=GaMMAPickFormat(),
-    station_transform=GaMMAStationFormat()
+    transform=SeisBenchPickFormat(),
+    station_transform=SeisBenchStationFormat()
 )
 sample = ds[0]
 

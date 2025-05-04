@@ -10,7 +10,8 @@ import numpy as np
 import pandas as pd
 
 from create_synthetic_data import create_synthetic_data
-from src.dataset import GaMMAPickFormat, GaMMAStationFormat, PhasePicksDataset
+from src.dataset import (PhasePicksDataset, SeisBenchPickFormat,
+                         SeisBenchStationFormat)
 from src.metrics import ClusterStatistics
 from src.plotting.arrivals import plot_arrivals
 from src.runners import run_gamma
@@ -91,8 +92,8 @@ for key, value in data_config.items():
         stations_file='stations.csv',
         file_mask='arrivals_*.csv',
         catalog_mask='catalog_*.csv',
-        transform=GaMMAPickFormat(),
-        station_transform=GaMMAStationFormat()
+        transform=SeisBenchPickFormat(),
+        station_transform=SeisBenchStationFormat()
     )
     stats[key] = ClusterStatistics()
 

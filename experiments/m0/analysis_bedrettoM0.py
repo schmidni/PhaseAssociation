@@ -7,7 +7,7 @@ import os
 import pandas as pd
 from matplotlib import pyplot as plt
 
-from src.dataset import GaMMAStationFormat, PhasePicksDataset
+from src.dataset import PhasePicksDataset, SeisBenchStationFormat
 from src.runners import run_gamma
 
 # %% preprocess
@@ -75,7 +75,7 @@ ds = PhasePicksDataset(
     stations_file='stations.csv',
     file_mask='*processed.csv',
     transform=GaMMAPickFormatBedretto(),
-    station_transform=GaMMAStationFormat()
+    station_transform=SeisBenchStationFormat()
 )
 
 # %%
