@@ -38,6 +38,8 @@ def create_synthetic_data(out_dir: Path,
 
     stations.to_csv(f'{out_dir}/stations.csv', index=False)
 
+    unq = np.random.randint(0, 1000)
+
     print("Creating synthetic catalogs...")
     for i in tqdm.tqdm(range(n_catalogs)):
 
@@ -60,8 +62,9 @@ def create_synthetic_data(out_dir: Path,
                                        noise_tt=noise_tt,
                                        noise_gmv=noise_gmv,
                                        pc_noise_picks=pc_noise_picks)
+        ev = int(np.ceil((min_events + max_events) / 2))
 
         arrivals.to_csv(
-            f'{out_dir}/arrivals_{duration}_{min_events}_{i}.csv', index=False)
+            f'{out_dir}/arrivals_{duration}_{ev}_{unq}_{i}.csv', index=False)
         catalog.to_csv(
-            f'{out_dir}/catalog_{duration}_{min_events}_{i}.csv', index=True)
+            f'{out_dir}/catalog_{duration}_{ev}_{unq}_{i}.csv', index=True)
