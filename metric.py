@@ -31,9 +31,9 @@ ds = PhasePicksDataset(
     ])
 )
 
-generator = torch.Generator().manual_seed(42)
+generator = torch.Generator()  # .manual_seed(42)
 train_dataset, test_dataset, validate_dataset = random_split(
-    ds, [0.3, 0.1, 0.6], generator=generator)
+    ds, [0.9, 0.09, 0.01], generator=generator)
 
 train_batch_size = 1
 train_loader = DataLoader(train_dataset, batch_size=train_batch_size,
@@ -152,13 +152,13 @@ def test_cluster(loader, model, device):
 ###############################################################################
 # ## Metric Learning
 
-num_epochs = 3
+num_epochs = 8
 total_steps = int(num_epochs * len(train_loader) / train_batch_size)
 
 # ## Model
 model = PhasePickTransformer(
     input_dim=ds[0].x.shape[1]-1, num_stations=len(ds.stations), embed_dim=128,
-    num_heads=4, num_layers=2, max_picks=1000).to(device)
+    num_heads=4, num_layers=2, max_picks=2000).to(device)
 
 # ## Scheduler and Optimizer
 
@@ -180,9 +180,8 @@ for epoch in range(1, num_epochs + 1):
 
     train(model, loss_func, mining_func, device,
           train_loader, optimizer, epoch, scheduler)
-    test_cluster(test_loader, model, device)
-
     torch.save(model.state_dict(), 'model')
+    test_cluster(test_loader, model, device)
 
 
 # %% VALIDATION
@@ -194,15 +193,15 @@ for epoch in range(1, num_epochs + 1):
 
 # %% VISUALIZATION
 ###############################################################################
-x, y, st, cat = next(itertools.islice(validate_loader, 44, None))
-x = x.to(device)
-st = st.to(device)
-embeddings = model(x, st)
-embeddings = embeddings.cpu().squeeze().detach().numpy()
-labels = y.squeeze().cpu().numpy()
+# x, y, st, cat = next(itertools.islice(validate_loader, 44, None))
+# x = x.to(device)
+# st = st.to(device)
+# embeddings = model(x, st)
+# embeddings = embeddings.cpu().squeeze().detach().numpy()
+# labels = y.squeeze().cpu().numpy()
 
-plot_embeddings_reduced(embeddings, labels, cat, method='tsne')
+# plot_embeddings_reduced(embeddings, labels, cat, method='tsne')
 
 # %%
-test_cluster(test_loader, model, device)
+# test_cluster(test_loader, model, device)
 # %%
