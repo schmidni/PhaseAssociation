@@ -137,7 +137,7 @@ def associate_phassoc(picks, station_df, config, verbose=False):
     pick_df = reindex_picks(pick_df_list)
 
     if verbose:
-        print(f'Associated {len(np.unique(pick_df['labels']))-1} '
+        print(f'Associated {len(np.unique(pick_df["labels"]))-1} '
               'unique events.')
 
     return pick_df, None
