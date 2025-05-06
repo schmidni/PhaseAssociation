@@ -23,7 +23,7 @@ def run_gamma(picks, stations, config):
 
     events = pd.DataFrame(events)
 
-    if len(associations) == 0:
+    if len(associations) == 0 or len(events) == 0:
         return events, np.full(len(picks), -1)
 
     events['time'] = pd.to_datetime(
@@ -40,5 +40,8 @@ def run_gamma(picks, stations, config):
 def run_harpa(picks, stations, config, verbose=False):
     pick_df_out, catalog_df = harpa_association(
         picks, stations, config, verbose=verbose)
+
+    catalog_df['time'] = catalog_df['time'].map(
+        lambda x: x.datetime)
 
     return catalog_df, pick_df_out['event_index'].to_numpy()

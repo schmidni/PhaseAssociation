@@ -47,8 +47,9 @@ def parse_synthetic_picks(picks: pd.DataFrame, stations: pd.DataFrame) \
                                   'phase': 'type',
                                   'amplitude': 'amp',
                                   'time': 'timestamp'})
-    picks = picks[['e', 'n', 'u', 'timestamp',
-                   'type', 'amp', 'id', 'id_index']]
+    columns = ['e', 'n', 'u', 'timestamp',
+               'type', 'amp', 'id', 'id_index']
+    picks = picks[[col for col in columns if col in picks.columns]]
 
     return picks, labels
 

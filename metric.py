@@ -10,7 +10,7 @@ from src.dataset import (ColumnsTransform, PhasePicksDataset, ReduceDatetime,
                          ScaleTransform, collate_fn, collate_fn_validate)
 from src.metrics import ClusterStatistics
 from src.models import PhasePickTransformer
-from src.plotting.embeddings import plot_embeddings_reduced
+from src.plotting.embeddings import plot_embeddings_events
 
 # %% Load data
 
@@ -200,7 +200,7 @@ for epoch in range(1, num_epochs + 1):
 # embeddings = embeddings.cpu().squeeze().detach().numpy()
 # labels = y.squeeze().cpu().numpy()
 
-# plot_embeddings_reduced(embeddings, labels, cat, method='tsne')
+# plot_embeddings_events(embeddings, labels, cat, method='tsne')
 
 # %%
 # test_cluster(test_loader, model, device)

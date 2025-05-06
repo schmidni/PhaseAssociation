@@ -70,21 +70,23 @@ def DBSCAN_cluster(picks, stations, config):
     return picks, unique_labels
 
 
-def run_phassoc(picks, stations, model_path, min_samples):
+def associate_phassoc(picks, stations, model_path, min_samples):
 
     picks = picks.join(stations.set_index('id'), on='id')
     station_index_mapping = pd.Series(stations.index, index=stations['id'])
     picks['id_index'] = picks['id'].map(station_index_mapping)
-    picks = picks.drop(
-        columns=['prob', 'id'])
+    picks = picks.drop(columns=['prob', 'id'])
+
     picks['timestamp'] = picks['timestamp'].values.astype(int)
     picks['timestamp'] = picks['timestamp'] - picks['timestamp'].min()
     picks['type'] = picks['type'].astype('category').cat.codes
-    picks = picks[['x(km)', 'y(km)', 'z(km)', 'timestamp',
-                   'type', 'amp', 'id_index']]
+
+    cols = ['x(km)', 'y(km)', 'z(km)', 'timestamp', 'type', 'amp', 'id_index']
+    picks = picks[[col for col in cols if col in picks.columns]]
 
     scaler = MinMaxScaler()
-    for col in ['x(km)', 'y(km)', 'z(km)', 'timestamp', 'amp']:
+    scale = ['x(km)', 'y(km)', 'z(km)', 'timestamp', 'amp']
+    for col in [s for s in scale if s in picks.columns]:
         picks[col] = scaler.fit_transform(picks[col].to_numpy().reshape(-1, 1))
 
     st = torch.tensor(picks['id_index'].to_numpy()).to(
@@ -96,7 +98,7 @@ def run_phassoc(picks, stations, model_path, min_samples):
         'cuda' if torch.cuda.is_available() else 'cpu')
 
     model = PhasePickTransformer(
-        input_dim=6, num_stations=len(stations),
+        input_dim=picks.shape[1]-1, num_stations=len(stations),
         embed_dim=128, num_heads=4, num_layers=2,
         max_picks=2000).to(device)
 
@@ -116,10 +118,10 @@ def run_phassoc(picks, stations, model_path, min_samples):
 
     picks['labels'] = db.labels_
 
-    return None, picks
+    return picks, embeddings
 
 
-def associate_phassoc(picks, station_df, config, verbose=False):
+def run_phassoc(picks, station_df, config, verbose=False):
     picks = copy.deepcopy(picks)
 
     picks, unique_labels = DBSCAN_cluster(picks, station_df, config)
@@ -129,11 +131,11 @@ def associate_phassoc(picks, station_df, config, verbose=False):
 
     pick_df_list = []
     for slice_index in range(len(unique_labels)):
-        _, pick_df = \
-            run_phassoc(picks[picks['dbs'] == slice_index],
-                        station_df,
-                        config['model'],
-                        config['min_picks_per_event'])
+        pick_df, embeddings = \
+            associate_phassoc(picks[picks['dbs'] == slice_index],
+                              station_df,
+                              config['model'],
+                              config['min_picks_per_event'])
         pick_df_list.append(pick_df)
     pick_df = reindex_picks(pick_df_list)
 
@@ -141,7 +143,7 @@ def associate_phassoc(picks, station_df, config, verbose=False):
         print(f'Associated {len(np.unique(pick_df["labels"]))-1} '
               'unique events.')
 
-    return pick_df, None
+    return None, pick_df, embeddings
 
 
 def reindex_picks(pick_df_list):

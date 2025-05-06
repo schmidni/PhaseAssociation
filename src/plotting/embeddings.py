@@ -5,7 +5,47 @@ from sklearn.decomposition import PCA
 from sklearn.manifold import TSNE
 
 
-def plot_embeddings_reduced(embeddings, labels, catalog, method='pca'):
+def plot_embeddings(embeddings, labels, title='', method='tsne'):
+    if isinstance(embeddings, torch.Tensor):
+        embeddings = embeddings.detach().cpu().numpy()
+    if isinstance(labels, torch.Tensor):
+        labels = labels.detach().cpu().numpy()
+
+    if method == 'pca':
+        reducer = PCA(n_components=2)
+
+    # Reduce dimensionality with t-SNE
+    if method == 'tsne':
+        reducer = TSNE(n_components=2, perplexity=30,
+                       max_iter=1000, init='random', random_state=42)
+
+    reduced = reducer.fit_transform(embeddings)
+
+    # Get unique labels
+    unique_labels = np.unique(labels)
+    num_classes = len(unique_labels)
+    cmap = plt.get_cmap('tab20', num_classes)
+    color_list = [cmap(i) for i in range(num_classes)]
+    color_list[0] = 'black'
+    label_to_color = {label: color_list[i]
+                      for i, label in enumerate(unique_labels)}
+    plt.figure(figsize=(14, 12))
+    for label in unique_labels:
+        idx = labels == label
+        plt.scatter(reduced[idx, 0], reduced[idx, 1],
+                    c=[label_to_color[label]],
+                    label=str(label), s=50, alpha=0.8)
+    plt.title(f'{method.upper()} of Seismic Pick Embeddings')
+    plt.xlabel('Dim 1' if method == 'tsne' else 'PC 1')
+    plt.ylabel('Dim 2' if method == 'tsne' else 'PC 2')
+    plt.grid(True)
+    plt.legend(title='Event Label', bbox_to_anchor=(
+        1.05, 1), loc='upper left', fontsize='small')
+    plt.tight_layout()
+    plt.show()
+
+
+def plot_embeddings_events(embeddings, labels, catalog, method='tsne'):
     """
     Plots 2D PCA projection of embeddings, colored by label.
 
@@ -20,6 +60,7 @@ def plot_embeddings_reduced(embeddings, labels, catalog, method='pca'):
         labels = labels.detach().cpu().numpy()
     if isinstance(catalog, torch.Tensor):
         catalog = catalog.detach().cpu().numpy()
+
     if not len(np.unique(labels)) - 1 == len(catalog.squeeze()):
         raise ValueError(
             "Number of unique labels does not match number of events.")

@@ -1,7 +1,7 @@
 # %%
 import tqdm
 
-from src import associate_phassoc
+from src import run_phassoc
 from src.dataset import (PhasePicksDataset, SeisBenchPickFormat,
                          SeisBenchStationFormat)
 from src.metrics import ClusterStatistics
@@ -31,7 +31,8 @@ ds = PhasePicksDataset(
 
 
 for sample in tqdm.tqdm(ds):
-    picks, _ = associate_phassoc(sample.x, ds.stations, config, verbose=True)
+    _, picks, embeddings = run_phassoc(
+        sample.x, ds.stations, config, verbose=True)
     y = sample.y.where(sample.y.map(sample.y.value_counts())
                        > config['min_picks_per_event'], -1)
 
