@@ -70,7 +70,7 @@ def DBSCAN_cluster(picks, stations, config):
     return picks, unique_labels
 
 
-def run_phassoc(picks, stations, model_path):
+def run_phassoc(picks, stations, model_path, min_samples):
 
     picks = picks.join(stations.set_index('id'), on='id')
     station_index_mapping = pd.Series(stations.index, index=stations['id'])
@@ -109,10 +109,10 @@ def run_phassoc(picks, stations, model_path):
         embeddings = model(xs.to(device), st.to(device))
 
     eps = estimate_eps_with_elbow(
-        embeddings.squeeze(), min_samples=4, plot=False)
+        embeddings.squeeze(), min_samples=min_samples, plot=False)
 
     embeddings = embeddings.cpu().squeeze().detach().numpy()
-    db = DBSCAN(eps=eps, min_samples=4).fit(embeddings)
+    db = DBSCAN(eps=eps, min_samples=min_samples).fit(embeddings)
 
     picks['labels'] = db.labels_
 
@@ -132,7 +132,8 @@ def associate_phassoc(picks, station_df, config, verbose=False):
         _, pick_df = \
             run_phassoc(picks[picks['dbs'] == slice_index],
                         station_df,
-                        config['model'])
+                        config['model'],
+                        config['min_picks_per_event'])
         pick_df_list.append(pick_df)
     pick_df = reindex_picks(pick_df_list)
 
