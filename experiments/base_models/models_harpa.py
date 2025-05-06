@@ -1,5 +1,5 @@
 # %% Imports and Configuration
-import itertools
+import warnings
 
 import tqdm
 
@@ -32,7 +32,7 @@ statistics = ClusterStatistics()
 
 
 ds = PhasePicksDataset(
-    root_dir='../../data/test_2',
+    root_dir='../../data/test_easy',
     stations_file='stations.csv',
     file_mask='arrivals_*.csv',
     catalog_mask='catalog_*.csv',
@@ -41,7 +41,11 @@ ds = PhasePicksDataset(
 )
 
 
-for sample in tqdm.tqdm(itertools.islice(ds, 0, 2)):
+warnings.filterwarnings("ignore", category=DeprecationWarning)
+warnings.filterwarnings("ignore", category=FutureWarning)
+warnings.filterwarnings("ignore", category=UserWarning)
+
+for sample in tqdm.tqdm(ds):
     cat, labels_pred = run_harpa(sample.x, ds.stations, config)
     y = sample.y.where(sample.y.map(sample.y.value_counts())
                        > config['min_peak_pre_event'], -1)
