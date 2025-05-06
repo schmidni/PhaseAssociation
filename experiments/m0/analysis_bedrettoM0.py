@@ -5,13 +5,14 @@ import os
 from copy import deepcopy
 
 import pandas as pd
+import pyocto
 
 from src import run_phassoc
 from src.dataset import (PhasePicksDataset, SeisBenchPickFormat,
                          SeisBenchStationFormat)
 from src.plotting.arrivals import plot_arrivals
 from src.plotting.embeddings import plot_embeddings
-from src.runners import run_gamma, run_harpa
+from src.runners import run_gamma, run_harpa, run_pyocto
 
 # %% preprocess
 catalog_files = sorted(
@@ -32,7 +33,7 @@ ds = PhasePicksDataset(
     station_transform=SeisBenchStationFormat()
 )
 
-SAMPLE = deepcopy(ds[0].x)
+SAMPLE = deepcopy(ds[1].x)
 
 # %%
 # Filter defective stations from the dataset
@@ -117,4 +118,53 @@ _, labels_phassoc, embeddings = run_phassoc(
 # %%
 plot_arrivals(SAMPLE, labels_phassoc['labels'], ds.stations, title='PhAssoc')
 plot_embeddings(embeddings, labels_phassoc['labels'], method='pca')
+
+# %%
+velocity_model = pyocto.VelocityModel0D(
+    p_velocity=5.5,
+    s_velocity=2.7,
+    tolerance=0.01,
+)
+
+associator = pyocto.OctoAssociator(
+    xlim=(0, -0.25),
+    ylim=(0, -0.15),
+    zlim=(0, 0.25),
+
+    time_before=0.1,  # 300,
+
+    velocity_model=velocity_model,
+
+    n_picks=8,
+    n_p_and_s_picks=4,
+    n_p_picks=4,
+    n_s_picks=4,
+
+    min_node_size=1e-1,  # 10.0, min node size for association
+    min_node_size_location=1,  # 1.5, min node size for location
+
+    pick_match_tolerance=0.1,  # 1.5, max diff predicted/observed time
+
+    min_interevent_time=1e-10,  # 3.0, min time between events
+
+    exponential_edt=False,  # leading to better locations
+    edt_pick_std=1.0,  # 1.0,
+
+    max_pick_overlap=4,  # 4, max number of picks shared between events
+
+    refinement_iterations=3,  # 3,
+    time_slicing=0.001,  # 1200.0,
+    node_log_interval=0,  # 0, # logging interval in seconds
+
+    location_split_depth=6,  # 6,
+    location_split_return=4,  # 4,
+    min_pick_fraction=0.25
+)
+
+cat_pyocto, labels_pyocto = run_pyocto(SAMPLE, ds.stations, associator)
+
+
+# %%
+plot_arrivals(SAMPLE, labels_pyocto, ds.stations, cat_pyocto, title='PyOcto')
+
 # %%

@@ -14,6 +14,11 @@ def run_pyocto(picks, stations, associator):
     events['z'] = 0.1
     events['time'] = events['time'].astype(int)*1e9
 
+    events = events.rename(columns={'x': 'x(km)',
+                                    'y': 'y(km)',
+                                    'z': 'z(km)'})
+    events['event_index'] = events.index
+
     return events, labels_pred
 
 
