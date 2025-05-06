@@ -1,30 +1,53 @@
 # %% Imports and Configuration
 import glob
-import itertools
 import multiprocessing
 import os
+from copy import deepcopy
 
 import pandas as pd
-from matplotlib import pyplot as plt
 
-from src.dataset import PhasePicksDataset, SeisBenchStationFormat
-from src.runners import run_gamma
+from src import run_phassoc
+from src.dataset import (PhasePicksDataset, SeisBenchPickFormat,
+                         SeisBenchStationFormat)
+from src.plotting.arrivals import plot_arrivals
+from src.plotting.embeddings import plot_embeddings
+from src.runners import run_gamma, run_harpa
 
 # %% preprocess
 catalog_files = sorted(
-    glob.glob(os.path.join('data/bedretto', '*Ss0.30.csv')))
+    glob.glob(os.path.join('../../data/m0', '*Ss0.30.csv')))
 
 for file in catalog_files:
     data = pd.read_csv(file)
     data = data.rename(columns={'trace_id': 'station',
-                                'onset_time': 'time',
-                                })
+                                'onset_time': 'time'})
     data['station'] = data['station'].str[3:8]
     data.to_csv(file.replace('.csv', '_processed.csv'))
 
+ds = PhasePicksDataset(
+    root_dir='../../data/m0',
+    stations_file='stations.csv',
+    file_mask='*processed.csv',
+    transform=SeisBenchPickFormat(),
+    station_transform=SeisBenchStationFormat()
+)
+
+SAMPLE = deepcopy(ds[0].x)
 
 # %%
-config = {
+# Filter defective stations from the dataset
+length_sample = len(SAMPLE)
+sizes = SAMPLE.groupby('id').size()
+# plt.bar(sizes.index, sizes.values)
+# plt.xticks(rotation=90)
+# plt.show()
+filter = ['V0506', 'V0510', 'V0702', 'V0812']
+SAMPLE = SAMPLE[~SAMPLE['id'].isin(filter)].reset_index(drop=True)
+print(
+    f'Filtered {length_sample-len(SAMPLE)} picks from {length_sample} picks')
+
+# %%
+config_gamma = {
     "ncpu": multiprocessing.cpu_count()-1,
     "dims": ['x(km)', 'y(km)', 'z(km)'],  # needs to be *(km), column names
     "use_amplitude": False,
@@ -43,91 +66,55 @@ config = {
     "dbscan_eps": 0.01,  # seconds
     "dbscan_min_samples": 5,
 
-    "min_picks_per_eq": 5,
+    "min_picks_per_eq": 6,
     "max_sigma11": 0.01,
     "max_sigma22": 2.0,
     # "max_sigma12": 2.0
 }
-
-
-class GaMMAPickFormatBedretto:
-    def __init__(self):
-        pass
-
-    def __call__(self, sample):
-        sample = sample.rename(columns={'station': 'id',
-                                        'phase': 'type',
-                                        # 'amplitude': 'amp',
-                                        'time': 'timestamp'
-                                        })
-        sample = sample[['id',
-                         'timestamp',
-                         'type',
-                        #  'amp'
-                         ]]
-        sample['timestamp'] = pd.to_datetime(sample['timestamp'], unit='ns')
-        sample['prob'] = 1
-        return sample
-
-
-ds = PhasePicksDataset(
-    root_dir='data/bedretto',
-    stations_file='stations.csv',
-    file_mask='*processed.csv',
-    transform=GaMMAPickFormatBedretto(),
-    station_transform=SeisBenchStationFormat()
-)
+cat_gamma, labels_gamma = run_gamma(SAMPLE, ds.stations, config_gamma)
 
 # %%
-print(len(ds[1].x))
-# %%
-cat_gmma, labels_pred = run_gamma(ds[1].x, ds.stations, config)
+plot_arrivals(SAMPLE, labels_gamma, ds.stations, cat_gamma, title='GaMMA')
 
 
 # %%
-print(cat_gmma)
+config_harpa = {
+    'x(km)': (-0.5, 0.5),
+    'y(km)': (-0.5, 0.5),
+    'z(km)': (-0.5, 0.5),
+    'vel': {'P': 5.4, 'S': 3.1},
+    'P_phase': True,
+    'S_phase': True,
+    'min_peak_pre_event': 6,
+    'min_peak_pre_event_s': 0,
+    'min_peak_pre_event_p': 0,
+    'lr_decay': 0.05,
+    'max_time_residual':  0.01,
+    'epochs_before_decay': 10000,
+    'epochs_after_decay': 10000,
+}
 
-
-# %%
-arrivals = ds[1].x.copy()
-starttime = arrivals['timestamp'].min().as_unit('ns')
-
-stations = ds.stations.copy()
-stations = stations.rename(
-    columns={'x(km)': 'x', 'y(km)': 'y', 'z(km)': 'z'})
-stations[['x', 'y', 'z']] = stations[['x', 'y', 'z']]*1e3
-
-arrivals = arrivals.rename(columns={'timestamp': 'time', 'id': 'station'})
-arrivals['time'] = arrivals['time'] - starttime
-arrivals['time'] = arrivals['time'].dt.total_seconds()*1e6
-arrivals = arrivals.join(stations.set_index('id'), on='station')
-arrivals = pd.concat([arrivals, pd.Series(labels_pred, name='label')], axis=1)
-
-events = cat_gmma.copy()
-events = events.rename(
-    columns={'x(km)': 'x', 'y(km)': 'y', 'z(km)': 'z'})
-events[['x', 'y', 'z']] = events[['x', 'y', 'z']]*1e3
-events['time'] = pd.to_datetime(events['time'], unit='ns') - starttime
-events['time'] = events['time'].dt.total_seconds()*1e6
+cat_harpa, labels_harpa = run_harpa(
+    SAMPLE, ds.stations, config_harpa, verbose=True)
 
 # %%
-plot_axis = 'y'
-fig, ax = plt.subplots(figsize=(16, 12))
-plt.xlabel('time [ms]', fontsize=20)
-plt.ylabel(f'Station {plot_axis}-coordinate [m]', fontsize=20)
-plt.xticks(fontsize=18)
-plt.yticks(fontsize=18)
-plt.ylim(arrivals[plot_axis].min()-10, arrivals[plot_axis].max()+10)
+plot_arrivals(SAMPLE, labels_harpa, ds.stations, cat_harpa, title='HARPA')
 
-color_iter = itertools.cycle(
-    ["black", "navy", "c", "cornflowerblue", "gold", "orange", "green",
-     "lime", "red", "purple", "blue", "pink", "brown", "gray",
-     "magenta", "cyan", "olive", "maroon", "darkslategray", "darkkhaki"])
+# %%
+config = {
+    'dbscan_eps': 0.1,
+    'vel': {
+        'P': 5.4,
+        'S': 3.1
+    },
+    'model': '../../models/model_noamp',
+    'min_picks_per_event': 6
+}
 
-for group, df in arrivals.groupby('label'):
-    color = color_iter.__next__()
-    ax.scatter(df['time'], df[plot_axis],
-               marker='o', color=color)
-    if not group == -1:
-        ax.scatter(events['time'][group], events[plot_axis][group],
-                   marker='x', color=color, s=200, linewidths=8)
+_, labels_phassoc, embeddings = run_phassoc(
+    SAMPLE, ds.stations, config, verbose=True)
+
+# %%
+plot_arrivals(SAMPLE, labels_phassoc['labels'], ds.stations, title='PhAssoc')
+plot_embeddings(embeddings, labels_phassoc['labels'], method='pca')
+# %%
