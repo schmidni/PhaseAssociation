@@ -141,59 +141,59 @@ def association(picks, stations, config, event_idx0=0, method="BGMM", **kwargs):
             events.extend(events_)
             assignment.extend(assignment_)
     else:
-        manager = mp.Manager()
-        lock = manager.Lock()
-        # event_idx0 - 1 as event_idx is increased before use
-        event_idx = manager.Value("i", event_idx0 - 1)
+        with mp.Manager() as manager:
+            lock = manager.Lock()
+            # event_idx0 - 1 as event_idx is increased before use
+            event_idx = manager.Value("i", event_idx0 - 1)
 
-        # print(f"Associating {len(unique_labels)} clusters with {config['ncpu']} CPUs")
+            # print(f"Associating {len(unique_labels)} clusters with {config['ncpu']} CPUs")
 
-        # the following sort and shuffle is to make sure jobs are distributed evenly
-        counter = Counter(labels)
-        unique_labels = sorted(
-            unique_labels, key=lambda x: counter[x], reverse=True)
-        np.random.shuffle(unique_labels)
+            # the following sort and shuffle is to make sure jobs are distributed evenly
+            counter = Counter(labels)
+            unique_labels = sorted(
+                unique_labels, key=lambda x: counter[x], reverse=True)
+            np.random.shuffle(unique_labels)
 
-        # the default chunk_size is len(unique_labels)//(config["ncpu"]*4), which makes some jobs very heavy
-        chunk_size = max(len(unique_labels) // (config["ncpu"] * 20), 1)
+            # the default chunk_size is len(unique_labels)//(config["ncpu"]*4), which makes some jobs very heavy
+            chunk_size = max(len(unique_labels) // (config["ncpu"] * 20), 1)
 
-        # Check for OS to start a child process in multiprocessing
-        # https://superfastpython.com/multiprocessing-context-in-python/
-        if platform.system().lower() in ["darwin", "windows"]:
-            context = "spawn"
-        else:
-            context = "fork"
+            # Check for OS to start a child process in multiprocessing
+            # https://superfastpython.com/multiprocessing-context-in-python/
+            if platform.system().lower() in ["darwin", "windows"]:
+                context = "spawn"
+            else:
+                context = "fork"
 
-        with mp.get_context(context).Pool(config["ncpu"]) as p:
-            results = p.starmap(
-                associate,
-                [
+            with mp.get_context(context).Pool(config["ncpu"]) as p:
+                results = p.starmap(
+                    associate,
                     [
-                        k,
-                        labels,
-                        data,
-                        locs,
-                        phase_type,
-                        phase_weight,
-                        pick_idx,
-                        pick_station_id,
-                        config,
-                        timestamp0,
-                        vel,
-                        method,
-                        event_idx,
-                        lock,
-                    ]
-                    for k in unique_labels
-                ],
-                chunksize=chunk_size,
-            )
-            # resuts is a list of tuples, each tuple contains two lists events and assignment
-            # here we flatten the list of tuples into two lists
-            events, assignment = [], []
-            for each_events, each_assignment in results:
-                events.extend(each_events)
-                assignment.extend(each_assignment)
+                        [
+                            k,
+                            labels,
+                            data,
+                            locs,
+                            phase_type,
+                            phase_weight,
+                            pick_idx,
+                            pick_station_id,
+                            config,
+                            timestamp0,
+                            vel,
+                            method,
+                            event_idx,
+                            lock,
+                        ]
+                        for k in unique_labels
+                    ],
+                    chunksize=chunk_size,
+                )
+                # resuts is a list of tuples, each tuple contains two lists events and assignment
+                # here we flatten the list of tuples into two lists
+                events, assignment = [], []
+                for each_events, each_assignment in results:
+                    events.extend(each_events)
+                    assignment.extend(each_assignment)
 
     return events, assignment  # , event_idx.value
 

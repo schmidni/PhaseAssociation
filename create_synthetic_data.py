@@ -6,11 +6,11 @@ from src.synthetics.create_associations import inventory_to_stations
 
 if __name__ == '__main__':
 
-    for i in [10]:
+    for i in [15]:
         DURATION = 1  # seconds
         # OUT_DIR = Path(f'data/{DURATION}s_{i}hz')
-        OUT_DIR = Path('data/test_20_1-0')
-        N_CATALOGS = 5
+        OUT_DIR = Path('data/test_30')
+        N_CATALOGS = 10
         AVG_RATE = i  # events per second
         RANGE = 0.2  # percent around which to vary the number of events
         NOISE_PICKS = True

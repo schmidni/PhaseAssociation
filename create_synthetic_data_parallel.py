@@ -8,16 +8,16 @@ from src.synthetics.create_associations import inventory_to_stations
 
 
 def run_simulation(i):
-    DURATION = 1  # seconds
-    OUT_DIR = Path(f'data/test_{i[0]}_{i[1]}')
-    N_CATALOGS = 100
+    DURATION = i[1]  # seconds
+    OUT_DIR = Path(f'data/test_{i[0]}_{i[2]}')
+    N_CATALOGS = 20
     AVG_RATE = i[0]
     RANGE = 0.1
     NOISE_PICKS = True
-    PC_NOISE_PICKS = i[1]
-    NOISE_TT = i[2]
-    NOISE_GMV = i[3]
-    MAX_MAGNITUDE = i[4]
+    PC_NOISE_PICKS = i[2]
+    NOISE_TT = i[3]
+    NOISE_GMV = i[4]
+    MAX_MAGNITUDE = i[5]
     OVERWRITE = True
 
     startdate = datetime(2025, 1, 1, 0, 0, 0)
@@ -41,18 +41,18 @@ def run_simulation(i):
         overwrite=OVERWRITE,
         noise_tt=NOISE_TT,
         noise_gmv=NOISE_GMV,
-        id=i[5]
+        id=i[6]
     )
 
 
 if __name__ == '__main__':
     # avg_rate, pc_noise_picks, noise_tt, noise_gmv, max_magnitude, id
     setting = [
-        (10, 0.1, 0.1, 0.05, 0.0, 0),
-        (10, 0.3, 0.1, 0.05, 0.0, 1),
-        (10, 0.5, 0.1, 0.05, 0.0, 2),
-        (10, 0.7, 0.1, 0.05, 0.0, 3),
-        (10, 0.9, 0.1, 0.05, 0.0, 4),
+        (10, 1, 0.1, 0.1, 0.1, 0.0, 0),
+        (10, 1, 0.3, 0.1, 0.1, 0.0, 1),
+        (10, 1, 0.5, 0.1, 0.1, 0.0, 2),
+        (10, 1, 0.7, 0.1, 0.1, 0.0, 4),
+        (10, 1, 0.9, 0.1, 0.1, 0.0, 5),
     ]
     ncpu = multiprocessing.cpu_count() - 1
     with ProcessPoolExecutor(max_workers=ncpu) as executor:
