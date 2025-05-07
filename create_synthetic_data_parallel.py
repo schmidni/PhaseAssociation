@@ -1,3 +1,4 @@
+import multiprocessing
 from concurrent.futures import ProcessPoolExecutor
 from datetime import datetime
 from pathlib import Path
@@ -7,9 +8,9 @@ from src.synthetics.create_associations import inventory_to_stations
 
 
 def run_simulation(i):
-    DURATION = 2  # seconds
-    OUT_DIR = Path('data/test')
-    N_CATALOGS = 1500
+    DURATION = 1  # seconds
+    OUT_DIR = Path(f'data/test_{i[0]}_{i[1]}')
+    N_CATALOGS = 100
     AVG_RATE = i[0]
     RANGE = 0.1
     NOISE_PICKS = True
@@ -17,6 +18,7 @@ def run_simulation(i):
     NOISE_TT = i[2]
     NOISE_GMV = i[3]
     MAX_MAGNITUDE = i[4]
+    OVERWRITE = True
 
     startdate = datetime(2025, 1, 1, 0, 0, 0)
     avg_events = DURATION * AVG_RATE
@@ -36,7 +38,7 @@ def run_simulation(i):
         add_noise_picks=NOISE_PICKS,
         pc_noise_picks=PC_NOISE_PICKS,
         max_magnitude=MAX_MAGNITUDE,
-        overwrite=False,
+        overwrite=OVERWRITE,
         noise_tt=NOISE_TT,
         noise_gmv=NOISE_GMV,
         id=i[5]
@@ -44,33 +46,14 @@ def run_simulation(i):
 
 
 if __name__ == '__main__':
+    # avg_rate, pc_noise_picks, noise_tt, noise_gmv, max_magnitude, id
     setting = [
-        (25, 0.1, 0.1, 0.05, -2.0, 0),
-        (25, 0.1, 0.1, 0.05, -1.0, 1),
-        (25, 0.1, 0.1, 0.05, 0.0, 2),
-        (25, 0.1, 0.1, 0.05, 1.0, 3),
-        (25, 0.1, 0.1, 0.05, 2.0, 4),
-        (50, 0.1, 0.1, 0.05, -2.0, 5),
-        (50, 0.1, 0.1, 0.05, -1.0, 6),
-        (50, 0.1, 0.1, 0.05, 0.0, 7),
-        (50, 0.1, 0.1, 0.05, 1.0, 8),
-        (50, 0.1, 0.1, 0.05, 2.0, 9),
-        (25, 0.2, 0.2,  0.1, -2.0, 10),
-        (25, 0.2, 0.2,  0.1, -1.0, 11),
-        (25, 0.2, 0.2,  0.1, 0.0, 12),
-        (25, 0.2, 0.2,  0.1, 1.0, 13),
-        (25, 0.2, 0.2,  0.1, 2.0, 14),
-        (50, 0.2, 0.2,  0.1, -2.0, 15),
-        (50, 0.2, 0.2,  0.1, -1.0, 16),
-        (50, 0.2, 0.2,  0.1, 0.0, 17),
-        (50, 0.2, 0.2,  0.1, 1.0, 18),
-        (50, 0.2, 0.2,  0.1, 2.0, 19),
-        (35, 0.15, 0.25, 0.15, -2.0, 20),
-        (35, 0.15, 0.25, 0.15, -1.0, 21),
-        (35, 0.15, 0.25, 0.15, 0.0, 22),
-        (35, 0.15, 0.25, 0.15, 1.0, 23),
-        (35, 0.15, 0.25, 0.15, 2.0, 24),
+        (10, 0.1, 0.1, 0.05, 0.0, 0),
+        (10, 0.3, 0.1, 0.05, 0.0, 1),
+        (10, 0.5, 0.1, 0.05, 0.0, 2),
+        (10, 0.7, 0.1, 0.05, 0.0, 3),
+        (10, 0.9, 0.1, 0.05, 0.0, 4),
     ]
-
-    with ProcessPoolExecutor(max_workers=12) as executor:
+    ncpu = multiprocessing.cpu_count() - 1
+    with ProcessPoolExecutor(max_workers=ncpu) as executor:
         executor.map(run_simulation, setting)

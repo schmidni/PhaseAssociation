@@ -32,7 +32,7 @@ statistics = ClusterStatistics()
 
 
 ds = PhasePicksDataset(
-    root_dir='../../data/test_easy',
+    root_dir='../../data/test_20_1-0',
     stations_file='stations.csv',
     file_mask='arrivals_*.csv',
     catalog_mask='catalog_*.csv',
